@@ -2,7 +2,15 @@
 
 This repository contains a headless Python port of the legacy NetLogo CoCoNet model.
 
-**User documentation (Jekyll):** the [`documentation/`](documentation/) directory holds a static site with installation, configuration, API, and I/O reference. On GitHub, enable **Settings → Pages → GitHub Actions**; pushes to `main` then publish to `https://<owner>.github.io/<repo>/` via the “Deploy documentation to GitHub Pages” workflow.
+| Resource | Link |
+| --- | --- |
+| **Documentation** (installation, configuration, CLI, API, I/O) | [gbrrestoration.github.io/coconet-python](https://gbrrestoration.github.io/coconet-python/) |
+| **PyPI package** (`pip install coconet-python`) | [pypi.org/project/coconet-python](https://pypi.org/project/coconet-python/) |
+| **Source** | [github.com/gbrrestoration/coconet-python](https://github.com/gbrrestoration/coconet-python) |
+
+The docs site is built with **Jekyll** from the [`documentation/`](https://github.com/gbrrestoration/coconet-python/tree/main/documentation) tree. Maintainers enable **Settings → Pages → Build and deployment: GitHub Actions**; pushes to **`main`** run **Deploy documentation to GitHub Pages** and update the URL above.
+
+> Links to the docs below use the **published site** so they work from this README on **GitHub** and on **PyPI** (which does not resolve repository-relative paths).
 
 ## Two ways to run CoCoNet
 
@@ -14,7 +22,7 @@ Use this when you want **files, flags, and environment variables**—for example
 
 - **Console script:** `coconet` (installed with the package).
 - **Module form:** `python -m coconet` (same behaviour as `coconet`).
-- **Typical inputs:** `--config` (YAML), `--parameter-file` (legacy CSV), `--reefs-file`, `--coastline-file`, `--output-file`, plus `COCONET_*` environment overrides. See **`coconet --help`** and the [CLI documentation](documentation/cli.md).
+- **Typical inputs:** `--config` (YAML), `--parameter-file` (legacy CSV), `--reefs-file`, `--coastline-file`, `--output-file`, plus `COCONET_*` environment overrides. See **`coconet --help`** and the [CLI documentation](https://gbrrestoration.github.io/coconet-python/cli/).
 
 The CLI handles **logging bootstrap**, optional **CPU profiling** (`--profile`, extra dependency), and applies a fixed set of **command-line overrides** on top of the shared configuration loader.
 
@@ -40,7 +48,7 @@ cfg = load_coconet_config(
 run_coconet(cfg, configure_logs=True)
 ```
 
-For **advanced** embedding you can still construct **`CoconetModel`** directly from **`CoconetConfig`**. See the [Python API](documentation/python-api.md) page for precedence, logging, and `__all__`.
+For **advanced** embedding you can still construct **`CoconetModel`** directly from **`CoconetConfig`**. See the [Python API](https://gbrrestoration.github.io/coconet-python/python-api/) page for precedence, logging, and `__all__`.
 
 ## Why this exists
 
@@ -76,7 +84,7 @@ uv run coconet --config config/example.yaml --output-file output.csv
 
 ## Docker (GitHub Container Registry)
 
-A container image is built with [GitHub Actions](.github/workflows/docker-publish.yml) on pushes to the default branch (`main`) and on SemVer tags `v*`. It is published to **GitHub Container Registry** as [`ghcr.io/gbrrestoration/coconet-python`](https://github.com/gbrrestoration/coconet-python/pkgs/container/coconet-python) (pull: `docker pull ghcr.io/gbrrestoration/coconet-python:latest`).
+A container image is built with [GitHub Actions](https://github.com/gbrrestoration/coconet-python/blob/main/.github/workflows/docker-publish.yml) on pushes to the default branch (`main`) and on SemVer tags `v*`. It is published to **GitHub Container Registry** as [`ghcr.io/gbrrestoration/coconet-python`](https://github.com/gbrrestoration/coconet-python/pkgs/container/coconet-python) (pull: `docker pull ghcr.io/gbrrestoration/coconet-python:latest`).
 
 The image is based on `python:3.12-slim-bookworm`, installs dependencies with **uv** (`uv sync --frozen`), bundles `legacy/` and `config/` under `/app`, and runs as UID **1000**. The container entrypoint is the **`coconet` CLI** (see [Two ways to run CoCoNet](#two-ways-to-run-coconet)). If you need the **library** interface instead, add `pip install coconet-python` (or copy the package) in your own image and call `load_coconet_config` / `run_coconet` from your code.
 
@@ -154,7 +162,7 @@ The implementation ports the NetLogo procedures and keeps important NetLogo sema
 
 ## Legacy parameter CSV (`--parameter-file`)
 
-The documentation site (Jekyll under `documentation/`, page **Scenario parameter semantics**) carries the same tables as the following sections for easier browsing once GitHub Pages is enabled.
+The documentation site ([**Scenario parameter semantics**](https://gbrrestoration.github.io/coconet-python/scenario-parameters/)) carries the same tables as the following sections for easier browsing in HTML.
 
 Rows are `Label, value` pairs. Blank lines are skipped. Parsing is **case-insensitive** on the label. The first row whose first cell is exactly `Ensemble` (the output table header) ends the config block; everything after that is treated as data rows, not parameters.
 

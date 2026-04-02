@@ -22,7 +22,7 @@ bundle exec jekyll serve --baseurl "/YOUR_REPO_NAME"
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 3. Push to the default branch; the workflow **Deploy documentation to GitHub Pages** uploads the `documentation/_site` artifact.
 
-If this is your first Pages deployment, wait for the workflow to finish; the site URL is shown on the workflow summary and on the Pages settings page (`https://<owner>.github.io/<repo>/` for project sites).
+If this is your first Pages deployment, wait for the workflow to finish; the site URL is shown on the workflow summary and on the Pages settings page (`https://<owner>.github.io/<repo>/` for project sites). For **gbrrestoration/coconet-python**, that is [https://gbrrestoration.github.io/coconet-python/](https://gbrrestoration.github.io/coconet-python/).
 
 ## Customisation
 

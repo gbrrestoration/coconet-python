@@ -19,6 +19,12 @@ profile = [
 [project.scripts]
 coconet = "coconet.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/gbrrestoration/coconet-python"
+Documentation = "https://gbrrestoration.github.io/coconet-python/"
+Repository = "https://github.com/gbrrestoration/coconet-python"
+Issues = "https://github.com/gbrrestoration/coconet-python/issues"
+
 [build-system]
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"

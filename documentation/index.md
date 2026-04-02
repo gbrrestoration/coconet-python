@@ -37,8 +37,7 @@ Details: [Getting started]({% link getting-started.md %}), [CLI]({% link cli.md 
 
 ## Published site
 
-This site is built with **Jekyll** and deployed to **GitHub Pages** on pushes to the default branch (see the workflow under `.github/workflows/` in the repository). After you enable Pages with the “GitHub Actions” source, the site is available at:
+This site is built with **Jekyll** and deployed to **GitHub Pages** on pushes to the default branch (workflow **Deploy documentation to GitHub Pages** in `.github/workflows/`). After you enable **Settings → Pages** with the **GitHub Actions** source, the site is available at:
 
-`https://<owner>.github.io/<repository>/`
-
-(Exact URL is shown in the workflow run and in the repository **Settings → Pages**.)
+- **This repo:** [https://gbrrestoration.github.io/coconet-python/](https://gbrrestoration.github.io/coconet-python/)
+- **Forks / other repos:** `https://<owner>.github.io/<repository>/` (also shown on the workflow summary and **Settings → Pages**).
