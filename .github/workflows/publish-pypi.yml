@@ -44,17 +44,15 @@ jobs:
       - name: Smoke install from TestPyPI
         run: |
           set -eux
-          PKG_SPEC="$(python -c "import tomllib; p = tomllib.load(open('pyproject.toml', 'rb'))['project']; print(f\"{p['name']}=={p['version']}\")")"
-          uv venv .venv-smoke
+          PKG_SPEC="$(python3 -c "import tomllib; p = tomllib.load(open('pyproject.toml', 'rb'))['project']; print(f\"{p['name']}=={p['version']}\")")"
+          python3 -m venv .venv-smoke
+          .venv-smoke/bin/python -m pip install -q -U pip
           MAX_ATTEMPTS=24
           SLEEP_SECS=15
           attempt=1
           while true; do
             echo "Smoke install attempt ${attempt}/${MAX_ATTEMPTS} (${PKG_SPEC})..."
-            # first-index (uv default): coconet-python exists on PyPI, so uv never considers
-            # newer versions-only-on-TestPyPI; unsafe-best-match merges indexes (OK for this job).
-            if uv pip install --python .venv-smoke/bin/python \
-              --index-strategy unsafe-best-match \
+            if .venv-smoke/bin/python -m pip install \
               --index-url https://test.pypi.org/simple \
               --extra-index-url https://pypi.org/simple \
               "${PKG_SPEC}"; then
