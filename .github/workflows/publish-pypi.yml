@@ -40,19 +40,30 @@ jobs:
       - name: Publish to TestPyPI
         run: uv publish --index testpypi
 
-      # TestPyPI’s simple index can lag briefly after upload; installing immediately often 404s.
-      - name: Wait for TestPyPI index
-        run: sleep 30
-
+      # TestPyPI’s PEP 503 simple index often lags minutes behind the project “Releases” UI; retry installs.
       - name: Smoke install from TestPyPI
         run: |
           set -eux
           PKG_SPEC="$(python -c "import tomllib; p = tomllib.load(open('pyproject.toml', 'rb'))['project']; print(f\"{p['name']}=={p['version']}\")")"
           uv venv .venv-smoke
-          uv pip install --python .venv-smoke/bin/python \
-            --index-url https://test.pypi.org/simple \
-            --extra-index-url https://pypi.org/simple \
-            "${PKG_SPEC}"
+          MAX_ATTEMPTS=24
+          SLEEP_SECS=15
+          attempt=1
+          while true; do
+            echo "Smoke install attempt ${attempt}/${MAX_ATTEMPTS} (${PKG_SPEC})..."
+            if uv pip install --python .venv-smoke/bin/python \
+              --index-url https://test.pypi.org/simple \
+              --extra-index-url https://pypi.org/simple \
+              "${PKG_SPEC}"; then
+              break
+            fi
+            if [ "${attempt}" -ge "${MAX_ATTEMPTS}" ]; then
+              echo "Smoke install still failing after ${MAX_ATTEMPTS} attempts; giving up."
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep "${SLEEP_SECS}"
+          done
           .venv-smoke/bin/python -c "from coconet import load_coconet_config, run_coconet; print('import-ok')"
 
       - name: Publish to PyPI
