@@ -40,6 +40,10 @@ jobs:
       - name: Publish to TestPyPI
         run: uv publish --index testpypi
 
+      # TestPyPI’s simple index can lag briefly after upload; installing immediately often 404s.
+      - name: Wait for TestPyPI index
+        run: sleep 30
+
       - name: Smoke install from TestPyPI
         run: |
           set -eux
