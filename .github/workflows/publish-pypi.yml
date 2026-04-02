@@ -51,7 +51,10 @@ jobs:
           attempt=1
           while true; do
             echo "Smoke install attempt ${attempt}/${MAX_ATTEMPTS} (${PKG_SPEC})..."
+            # first-index (uv default): coconet-python exists on PyPI, so uv never considers
+            # newer versions-only-on-TestPyPI; unsafe-best-match merges indexes (OK for this job).
             if uv pip install --python .venv-smoke/bin/python \
+              --index-strategy unsafe-best-match \
               --index-url https://test.pypi.org/simple \
               --extra-index-url https://pypi.org/simple \
               "${PKG_SPEC}"; then
