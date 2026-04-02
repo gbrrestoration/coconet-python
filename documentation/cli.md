@@ -1,9 +1,20 @@
 ---
 title: Command-line interface
-description: coconet entry point, flags, profiling, and logging.
+description: The CLI entry point (coconet / python -m coconet)—files, flags, profiling, and logging for shell and container workflows.
 ---
 
-The console script **`coconet`** is declared in `pyproject.toml` as `coconet.cli:main`.
+This page documents the **CLI entry point**: runs driven by **file paths, flags, environment variables**, and optional **profiling**. It is what you use in terminals, in the **official Docker image**, and in CI jobs that do not need a custom Python driver.
+
+For **programmatic** control (notebooks, services, other Python tools), use the **library** instead: **`pip install coconet-python`** and see [Python API]({% link python-api.md %}).
+
+## How to invoke
+
+| Invocation | Notes |
+| --- | --- |
+| **`coconet ...`** | Console script from `pyproject.toml` → `coconet.cli:main`. |
+| **`python -m coconet ...`** | Same behaviour; uses `coconet/__main__.py`. |
+
+Internally the CLI builds configuration with **`load_coconet_config`** (see `coconet.api`) and runs the model with **`run_coconet(..., configure_logs=False)`** after it has configured logging itself.
 
 ## Arguments
 
@@ -19,7 +30,7 @@ The console script **`coconet`** is declared in `pyproject.toml` as `coconet.cli
 
 ## Profiling (optional extra)
 
-Requires `pyinstrument` (`uv sync --extra profile` or `pip install coconet[profile]`).
+Requires `pyinstrument` (`uv sync --extra profile` or `pip install "coconet-python[profile]"`).
 
 | Option | Effect |
 | --- | --- |
@@ -34,10 +45,11 @@ On very long runs, HTML output may resample heavily; the CLI logs a hint when sa
 ## Loading sequence
 
 1. Bootstrap logging from `--log-level` or `COCONET_LOG_LEVEL` or `INFO`.
-2. `CoconetConfig.from_file(config_file=args.config, parameter_file=args.parameter_file)`.
-3. Apply CLI overrides for output path, reef/coastline files, log level, `ensemble_threads`.
-4. Re-configure logging from the final `config.log_level` if needed.
-5. Construct `CoconetModel` and call `run()` (optionally under the profiler).
+2. **`load_coconet_config`** with `config_file`, `parameter_file`, and CLI-only overrides (`output_file`, `reefs_file`, `coastline_file`, `log_level`, `ensemble_threads` when provided).
+3. Re-configure logging from the final **`config.log_level`** if needed.
+4. **`run_coconet(config, configure_logs=False)`** (optionally wrapped by the profiler).
+
+So: **YAML + legacy CSV + `COCONET_*` env** are merged inside **`load_coconet_config`**; CLI flags then override specific path and execution fields only.
 
 ## Logging format
 

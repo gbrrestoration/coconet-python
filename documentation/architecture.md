@@ -9,8 +9,9 @@ description: How the Python package maps to the legacy NetLogo model and executi
 | --- | --- |
 | **`CoconetConfig`** | Typed scenario + I/O paths; YAML, legacy CSV, and environment merge. |
 | **`CoconetModel`** | All dynamic state (NumPy arrays), annual procedures, output writers. |
+| **`coconet.api`** | **Library entry point**: `load_coconet_config`, `run_coconet` (stable embedding for PyPI consumers). |
 | **`NetLogoRng`** | Parity-oriented RNG behaviour aligned with NetLogo usage patterns. |
-| **`coconet.cli`** | Argument parsing, environment bootstrap, optional pyinstrument profiling. |
+| **`coconet.cli`** | **CLI entry point**: argument parsing, logging bootstrap, optional pyinstrument profiling; calls **`load_coconet_config`** + **`run_coconet`**. |
 | **`logging_utils`** | Normalized log levels and `basicConfig` setup. |
 
 ## State representation

@@ -13,7 +13,9 @@ A small **Node** CLI that ingests `output.csv` and produces **PNG** charts using
 
 ## Docker
 
-The repository ships a container workflow (`.github/workflows/docker-publish.yml`) that publishes images to **GitHub Container Registry** (`ghcr.io`) on pushes to the default branch and version tags. Use the image for reproducible runs in CI or cloud environments; mount your `config/`, `legacy/`, or output directories as volumes as needed.
+The repository ships a container workflow (`.github/workflows/docker-publish.yml`) that publishes images to **GitHub Container Registry** (`ghcr.io`) on pushes to the default branch and version tags. The published image uses the **CLI entry point** (`coconet` with appropriate `CMD`/entrypoint): reproduce runs by passing YAML, legacy CSV, and paths as **container arguments**, with volumes for data and outputs.
+
+For the **library entry point** inside a container, install **`coconet-python`** from PyPI in your own image (or extend the Dockerfile) and call **`load_coconet_config`** / **`run_coconet`** from your application code.
 
 ## Documentation site
 

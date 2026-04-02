@@ -27,6 +27,8 @@ The Python model supports:
 2. **YAML config files** for modern workflows,
 3. **Environment variable overrides** with the `COCONET_` prefix.
 
+You can drive these from the **CLI** (files and flags) or from the **library** (`load_coconet_config`, `CoconetConfig.from_file`); see [Getting started]({% link getting-started.md %}).
+
 ## Known implementation choices
 
 - Internal state is held in **NumPy arrays** with explicit reef / site indexing.

@@ -1,0 +1,55 @@
+name: Publish to PyPI
+
+# Trusted publishing (OpenID Connect): PyPI and TestPyPI exchange a short-lived token with
+# GitHub Actions. Do not set PYPI_API_TOKEN, TEST_PYPI_API_TOKEN, or UV_PUBLISH_TOKEN.
+#
+# One-time setup:
+# 1. GitHub → Settings → Environments → create environment named `pypi` (recommended:
+#    require reviewers for production releases, or leave open while iterating).
+# 2. TestPyPI → project `coconet-python` → Settings → Publishing → add a trusted publisher:
+#    - Workflow: `publish-pypi.yml` in this repo
+#    - Environment: `pypi` (must match `jobs.publish.environment` below)
+# 3. PyPI → same project → Settings → Publishing → add the same publisher
+#    (repo, workflow file, environment `pypi`).
+#
+# Publishes to TestPyPI first, smoke-installs, then publishes to PyPI.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build distributions
+        run: uv build --no-sources
+
+      - name: Publish to TestPyPI
+        run: uv publish --index testpypi
+
+      - name: Smoke install from TestPyPI
+        run: |
+          set -eux
+          PKG_SPEC="$(python -c "import tomllib; p = tomllib.load(open('pyproject.toml', 'rb'))['project']; print(f\"{p['name']}=={p['version']}\")")"
+          uv venv .venv-smoke
+          uv pip install --python .venv-smoke/bin/python \
+            --index-url https://test.pypi.org/simple \
+            --extra-index-url https://pypi.org/simple \
+            "${PKG_SPEC}"
+          .venv-smoke/bin/python -c "from coconet import load_coconet_config, run_coconet; print('import-ok')"
+
+      - name: Publish to PyPI
+        run: uv publish

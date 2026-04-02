@@ -6,11 +6,10 @@ import io
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from coconet.config import CoconetConfig
+from coconet.api import load_coconet_config, run_coconet
 from coconet.logging_utils import configure_logging
-from coconet.model import CoconetModel
 
 if TYPE_CHECKING:
     from pyinstrument import Profiler
@@ -151,11 +150,6 @@ def _write_profile_dump(
     path.write_text(content, encoding="utf-8")
 
 
-def _run_model(config: CoconetConfig) -> None:
-    model = CoconetModel(config)
-    model.run()
-
-
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -174,21 +168,23 @@ def main() -> None:
         args.parameter_file,
     )
 
-    config = CoconetConfig.from_file(
+    cli_overrides: dict[str, Any] = {}
+    if args.output_file is not None:
+        cli_overrides["output_file"] = str(args.output_file)
+    if args.reefs_file is not None:
+        cli_overrides["reefs_file"] = str(args.reefs_file)
+    if args.coastline_file is not None:
+        cli_overrides["coastline_file"] = str(args.coastline_file)
+    if args.log_level is not None:
+        cli_overrides["log_level"] = args.log_level
+    if args.ensemble_threads is not None:
+        cli_overrides["ensemble_threads"] = args.ensemble_threads
+
+    config = load_coconet_config(
         config_file=args.config,
         parameter_file=args.parameter_file,
+        **cli_overrides,
     )
-
-    if args.output_file is not None:
-        config.output_file = str(args.output_file)
-    if args.reefs_file is not None:
-        config.reefs_file = str(args.reefs_file)
-    if args.coastline_file is not None:
-        config.coastline_file = str(args.coastline_file)
-    if args.log_level is not None:
-        config.log_level = args.log_level
-    if args.ensemble_threads is not None:
-        config.ensemble_threads = args.ensemble_threads
 
     try:
         effective_log_level = configure_logging(config.log_level)
@@ -214,7 +210,7 @@ def main() -> None:
         except ImportError:
             parser.error(
                 "Profiling needs pyinstrument. Install the optional extra, e.g. "
-                "`uv sync --extra profile` or `pip install coconet[profile]`."
+                "`uv sync --extra profile` or `pip install 'coconet-python[profile]'`."
             )
         if args.profile_interval <= 0:
             parser.error("--profile-interval must be positive.")
@@ -230,7 +226,7 @@ def main() -> None:
         profiler = Profiler(interval=args.profile_interval)
         profiler.start()
         try:
-            _run_model(config)
+            run_coconet(config, configure_logs=False)
         finally:
             profiler.stop()
             _write_profile_dump(
@@ -246,7 +242,7 @@ def main() -> None:
             out.resolve(),
         )
     else:
-        _run_model(config)
+        run_coconet(config, configure_logs=False)
 
     logger.info("CoCoNet run finished successfully.")
 

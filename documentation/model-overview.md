@@ -5,6 +5,8 @@ description: Schedule, ensembles, coral and CoTS structure, and intervention hoo
 
 CoCoNet is a **reef- and site-resolved** simulation with an **annual** time step. The Python port follows the legacy NetLogo **setup → annual loop** structure and reproduces important ordering and RNG-related behaviour via `NetLogoRng` and explicit loop orders in `coconet/model.py`.
 
+You execute the same engine from the **CLI** or the **PyPI library** (**`coconet-python`**); see [Getting started]({% link getting-started.md %}).
+
 ## Ensembles and spin-up
 
 - **Ensemble 0** is **spin-up**: simulation can begin at `start_year - spinup_backtrack_years` and runs forward to build trajectory history.

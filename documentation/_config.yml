@@ -2,7 +2,8 @@
 title: CoCoNet (Python)
 description: >-
   User documentation for the headless Python port of the CoCoNet Great Barrier Reef
-  simulation model (legacy NetLogo CoCoNet v3).
+  simulation model (legacy NetLogo CoCoNet v3): CLI and PyPI library (coconet-python) entry points,
+  configuration, and I/O reference.
 url: ""
 # baseurl filled by GitHub Actions (repository name). For local preview: jekyll serve --baseurl ""
 baseurl: ""

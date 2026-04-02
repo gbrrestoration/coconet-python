@@ -1,5 +1,7 @@
 # CoCoNet user documentation (Jekyll)
 
+The site emphasizes **two entry points** for the same engine: the **CLI** (`coconet` / `python -m coconet`) for shells and containers, and the **library** published on PyPI as **`coconet-python`** (`load_coconet_config`, `run_coconet`). Keep that distinction clear when editing pages.
+
 Build and preview locally:
 
 ```bash

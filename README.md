@@ -4,6 +4,44 @@ This repository contains a headless Python port of the legacy NetLogo CoCoNet mo
 
 **User documentation (Jekyll):** the [`documentation/`](documentation/) directory holds a static site with installation, configuration, API, and I/O reference. On GitHub, enable **Settings → Pages → GitHub Actions**; pushes to `main` then publish to `https://<owner>.github.io/<repo>/` via the “Deploy documentation to GitHub Pages” workflow.
 
+## Two ways to run CoCoNet
+
+The same simulation engine is exposed for **shell-oriented workflows** and for **programmatic control**. Pick the entry point that matches how you are integrating the model.
+
+### 1. Command-line interface (CLI)
+
+Use this when you want **files, flags, and environment variables**—for example local terminals, Docker (the published image uses the CLI as its entrypoint), shell scripts, or CI jobs that only need to pass paths.
+
+- **Console script:** `coconet` (installed with the package).
+- **Module form:** `python -m coconet` (same behaviour as `coconet`).
+- **Typical inputs:** `--config` (YAML), `--parameter-file` (legacy CSV), `--reefs-file`, `--coastline-file`, `--output-file`, plus `COCONET_*` environment overrides. See **`coconet --help`** and the [CLI documentation](documentation/cli.md).
+
+The CLI handles **logging bootstrap**, optional **CPU profiling** (`--profile`, extra dependency), and applies a fixed set of **command-line overrides** on top of the shared configuration loader.
+
+### 2. Python library (PyPI package **coconet-python**)
+
+Use this when you need **full control from Python**—custom CLIs, web services, notebooks, schedulers, or multi-step pipelines. Install from **PyPI** (distribution name **`coconet-python`**; import package remains **`coconet`**):
+
+```bash
+pip install coconet-python
+```
+
+The stable library surface is **`load_coconet_config`** and **`run_coconet`** in `coconet.api` (re-exported from `coconet`). Build a `CoconetConfig` from YAML paths, legacy CSV, environment, an optional **`scenario`** dict, and keyword overrides, then run:
+
+```python
+from coconet import load_coconet_config, run_coconet
+
+cfg = load_coconet_config(
+    config_file="config/example.yaml",
+    reefs_file="legacy/reefs2024.csv",
+    coastline_file="legacy/coastline.csv",
+    output_file="out/run.csv",
+)
+run_coconet(cfg, configure_logs=True)
+```
+
+For **advanced** embedding you can still construct **`CoconetModel`** directly from **`CoconetConfig`**. See the [Python API](documentation/python-api.md) page for precedence, logging, and `__all__`.
+
 ## Why this exists
 
 The `legacy/` directory contains the original monolithic NetLogo model (`CoCoNet V3_rubble.nlogo`) and its data files. This port migrates the model to a modern Python stack for:
@@ -19,9 +57,11 @@ The `legacy/` directory contains the original monolithic NetLogo model (`CoCoNet
 - `coconet/` - Python implementation:
   - `config.py` - typed configuration and legacy parameter CSV parsing,
   - `model.py` - simulation engine (ported procedures),
-  - `cli.py` - command line entry point.
+  - `api.py` - **library** entry points (`load_coconet_config`, `run_coconet`) for PyPI consumers and embedders,
+  - `cli.py` - **CLI** entry point (`coconet` / `python -m coconet`),
+  - `__main__.py` - delegates to the CLI for `python -m coconet`.
 
-## Running with uv
+## Running with uv (from a git checkout)
 
 ```bash
 uv sync
@@ -38,7 +78,7 @@ uv run coconet --config config/example.yaml --output-file output.csv
 
 A container image is built with [GitHub Actions](.github/workflows/docker-publish.yml) on pushes to the default branch (`main`) and on SemVer tags `v*`. It is published to **GitHub Container Registry** as [`ghcr.io/gbrrestoration/coconet-python`](https://github.com/gbrrestoration/coconet-python/pkgs/container/coconet-python) (pull: `docker pull ghcr.io/gbrrestoration/coconet-python:latest`).
 
-The image is based on `python:3.12-slim-bookworm`, installs dependencies with **uv** (`uv sync --frozen`), bundles `legacy/` and `config/` under `/app`, and runs as UID **1000**. The container entrypoint is the `coconet` CLI.
+The image is based on `python:3.12-slim-bookworm`, installs dependencies with **uv** (`uv sync --frozen`), bundles `legacy/` and `config/` under `/app`, and runs as UID **1000**. The container entrypoint is the **`coconet` CLI** (see [Two ways to run CoCoNet](#two-ways-to-run-coconet)). If you need the **library** interface instead, add `pip install coconet-python` (or copy the package) in your own image and call `load_coconet_config` / `run_coconet` from your code.
 
 ### Input and output paths
 

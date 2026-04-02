@@ -3,6 +3,8 @@ title: Inputs and outputs
 description: Spatial CSV inputs, coastline file, main output schema, and search-mode files.
 ---
 
+Paths such as **`reefs_file`**, **`coastline_file`**, and **`output_file`** are set on **`CoconetConfig`**—via YAML, environment variables, the **CLI** flags **`--reefs-file`**, **`--coastline-file`**, **`--output-file`**, or **`load_coconet_config`** / direct assignment when using the **library**. See [Getting started]({% link getting-started.md %}).
+
 ## Reef CSV (`reefs_file`)
 
 Default: `legacy/reefs2024.csv`.

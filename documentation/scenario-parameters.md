@@ -3,7 +3,7 @@ title: Scenario parameter semantics
 description: Legacy CSV labels, CoconetConfig fields, and the role of each scenario knob (from the repository README).
 ---
 
-This page documents how **legacy parameter CSV** rows map to **`CoconetConfig`** and what each control does in the model. It mirrors the authoritative discussion in the repository README so users can read scenarios without leaving the docs site.
+This page documents how **legacy parameter CSV** rows map to **`CoconetConfig`** and what each control does in the model. It mirrors the authoritative discussion in the repository README so users can read scenarios without leaving the docs site. You can supply these files from the **CLI** (`--parameter-file`) or when building config in Python via **`load_coconet_config`** / **`CoconetConfig.from_file`** (**library**); see [Getting started]({% link getting-started.md %}).
 
 For load order (YAML, CSV, environment), see [Configuration]({% link configuration.md %}). For the Python `label_to_attr` map, see `coconet/config.py`.
 

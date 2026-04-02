@@ -3,14 +3,22 @@ title: Configuration
 description: Reference for CoconetConfig, YAML keys, legacy CSV labels, and environment variables.
 ---
 
-Configuration is represented by the **`CoconetConfig`** dataclass in `coconet/config.py`. Values are merged in this order:
+Configuration is represented by the **`CoconetConfig`** dataclass in `coconet/config.py`.
+
+### Merge order (shared loader)
+
+These steps apply to **`CoconetConfig.from_file`** and to the high-level library helper **`load_coconet_config`** in `coconet/api.py` (**library entry point**). The **`load_coconet_config`** function adds optional **`scenario`** (a flat mapping of field names) and keyword **overrides** *after* environment variables; see [Python API]({% link python-api.md %}).
 
 1. **Defaults** on the dataclass.
-2. **YAML** file (if `--config` / `from_file(config_file=...)`): any key matching a field name updates that field.
-3. **Legacy parameter CSV** (if `--parameter-file` / `from_file(parameter_file=...)`): rows are `Label, value`; labels map to fields (case-insensitive). The first row whose first cell is exactly `Ensemble` ends the parameter block (starts the output table in legacy templates).
+2. **YAML** file when provided (CLI **`--config`**, or `from_file` / `load_coconet_config` **`config_file`**): any key matching a field name updates that field.
+3. **Legacy parameter CSV** when provided (CLI **`--parameter-file`**, or `parameter_file=`): rows are `Label, value`; labels map to fields (case-insensitive). The first row whose first cell is exactly `Ensemble` ends the parameter block (starts the output table in legacy templates).
 4. **Environment variables** with prefix **`COCONET_`** (default): suffix is matched case-insensitively to field names; values are parsed as booleans, integers, floats, or strings.
+5. **`load_coconet_config` only:** optional **`scenario`** dict, then keyword **`overrides`** (`None` skipped). Unknown keys raise **`TypeError`**.
 
-CLI arguments (where supported) apply **after** `from_file` and override individual fields.
+### CLI vs library after the merge
+
+- **CLI** ([Command-line interface]({% link cli.md %})): after the shared merge (steps 1–4 via **`load_coconet_config`**), the CLI applies **flag overrides** for output path, reef/coastline paths, **`log_level`**, and **`ensemble_threads`** when those flags are present.
+- **Library**: pass paths and knobs as **`load_coconet_config`** arguments or mutate **`CoconetConfig`** before **`run_coconet`** / **`CoconetModel.run()`**.
 
 ## Fields (full reference)
 
@@ -127,5 +135,6 @@ For **what each scenario field does** in the model (CoTS, fishing, rubble, seedi
 
 ## Helpers (library use)
 
+- **`load_coconet_config`** / **`run_coconet`** (`coconet.api`) — preferred **library** entry points for building config and running the model (see [Python API]({% link python-api.md %})).
 - **`effective_ensemble_workers(ensemble_threads, ensemble_runs)`** — cap on parallel worker processes.
 - **`use_parallel_ensemble_run(ensemble_threads, ensemble_runs)`** — whether the model will use a process pool after spin-up.
