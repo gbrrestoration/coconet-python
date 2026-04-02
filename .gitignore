@@ -205,3 +205,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Coconet specifics
+# Profiler exports (contain local absolute paths / usernames)
+coconet-profile.html
+*-profile.html
+
+output.csv
+config/*
+!config/example.yaml
+!config/small_example.csv
+
+outputs

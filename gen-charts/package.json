@@ -1,0 +1,23 @@
+{
+  "name": "gen-charts",
+  "version": "1.0.0",
+  "description": "Generate static PNG charts from CoCoNet output.csv",
+  "type": "module",
+  "main": "cli.js",
+  "bin": {
+    "gen-charts": "./cli.js"
+  },
+  "scripts": {
+    "gen": "node ./cli.js",
+    "test": "node ./cli.js --help"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "papaparse": "^5.5.3",
+    "vega": "^6.2.0",
+    "vega-lite": "^6.4.2"
+  }
+}

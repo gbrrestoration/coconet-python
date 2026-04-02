@@ -1,0 +1,25 @@
+SSP: 2.6
+ensemble_runs: 1
+start_year: 1956
+save_year: 1986
+projection_year: 2025
+search_year: 9999
+end_year: 1990
+
+reefs_file: legacy/reefs2024.csv
+coastline_file: legacy/coastline.csv
+output_file: output.csv
+log_level: INFO
+
+start_CoTS_control: 9999
+CoTS_vessels_GBR: 0
+CoTS_vessels_FN: 0
+CoTS_vessels_N: 0
+CoTS_vessels_C: 0
+CoTS_vessels_S: 0
+
+start_modified_fishing: 9999
+catch_reduction: 0.0
+
+start_coral_seeding: 9999
+seed_reefs: 0

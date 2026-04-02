@@ -1,0 +1,27 @@
+[project]
+name = "coconet"
+version = "0.1.0"
+description = "Headless Python port of the legacy CoCoNet NetLogo model."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.2.0",
+  "pandas>=2.2.0",
+  "pyyaml>=6.0.0",
+  "threadpoolctl>=3.5.0",
+]
+
+[project.optional-dependencies]
+profile = [
+  "pyinstrument>=5.0.0",
+]
+
+[project.scripts]
+coconet = "coconet.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
