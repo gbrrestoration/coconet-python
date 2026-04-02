@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 
-
 VALID_LOG_LEVELS = ("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG")
 
 

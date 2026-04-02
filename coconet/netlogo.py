@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import cast
 
 import numpy as np
 
 
 def nl_round(value: float) -> int:
     if value >= 0:
-        return int(math.floor(value + 0.5))
-    return int(math.ceil(value - 0.5))
+        return math.floor(value + 0.5)
+    return math.ceil(value - 0.5)
 
 
 def nl_ceiling(value: float) -> int:
-    return int(math.ceil(value))
+    return math.ceil(value)
 
 
 def nl_median(a: float, b: float, c: float) -> float:
@@ -31,7 +32,8 @@ def nl_median(a: float, b: float, c: float) -> float:
 
 def heading_from_dx_dy(dx: np.ndarray, dy: np.ndarray) -> np.ndarray:
     """NetLogo heading in degrees clockwise from north."""
-    return (np.degrees(np.arctan2(dx, dy)) + 360.0) % 360.0
+    heading = (np.degrees(np.arctan2(dx, dy)) + 360.0) % 360.0
+    return cast(np.ndarray, heading)
 
 
 @dataclass(slots=True)
@@ -50,7 +52,7 @@ class NetLogoRng:
         return float(self._rs.random_sample() * upper)
 
     def random_int(self, upper: float) -> int:
-        n = int(math.floor(upper))
+        n = math.floor(upper)
         if n <= 0:
             return 0
         return int(self._rs.randint(0, n))

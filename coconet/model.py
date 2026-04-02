@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from concurrent.futures import Future, ProcessPoolExecutor
-from dataclasses import dataclass, replace
 import logging
 import math
 import multiprocessing as mp
-from pathlib import Path
 import shutil
 import tempfile
 import time
-from typing import Iterable
+from collections.abc import Iterable
+from concurrent.futures import Future, ProcessPoolExecutor
+from dataclasses import dataclass, replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,6 @@ from coconet.config import (
 )
 from coconet.logging_utils import configure_logging
 from coconet.netlogo import NetLogoRng, heading_from_dx_dy, nl_ceiling, nl_median, nl_round
-
 
 CORAL_GROUPS = ("sa", "ta", "mo", "po", "fa", "tt")
 # Coral larval kernel inner loop order in spawn (legacy NetLogo). RNG must draw
@@ -259,9 +258,7 @@ class CoconetModel:
 
     def run(self) -> None:
         run_start = time.perf_counter()
-        workers = effective_ensemble_workers(
-            self.cfg.ensemble_threads, self.cfg.ensemble_runs
-        )
+        workers = effective_ensemble_workers(self.cfg.ensemble_threads, self.cfg.ensemble_runs)
         logger.info(
             "Run started (ensemble_runs=%s ensemble_threads=%s effective_worker_cap=%s "
             "start_year=%s spinup_backtrack_years=%s end_year=%s save_year=%s "
@@ -321,9 +318,7 @@ class CoconetModel:
             self.ensemble - 1,
         )
 
-    def _run_with_parallel_simulation_ensembles(
-        self, run_start: float, max_workers: int
-    ) -> None:
+    def _run_with_parallel_simulation_ensembles(self, run_start: float, max_workers: int) -> None:
         self.ensemble = 0
         ensemble_start = time.perf_counter()
         logger.info(
@@ -351,11 +346,7 @@ class CoconetModel:
             with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
                 for e in range(1, self.cfg.ensemble_runs + 1):
                     out_part = tmpdir / f"output_{e}.csv"
-                    pri_part = (
-                        tmpdir / f"priority_{e}.csv"
-                        if self.search_mode == 1
-                        else None
-                    )
+                    pri_part = tmpdir / f"priority_{e}.csv" if self.search_mode == 1 else None
                     futures[e] = executor.submit(
                         _run_simulation_ensemble_worker,
                         replace(self.cfg),
@@ -470,19 +461,12 @@ class CoconetModel:
             for reef_idx in range(self.number_of_reefs):
                 self.spawn_corals(reef_idx)
 
-            if (
-                0.5
-                * (
-                    1
-                    + math.sin(
-                        2
-                        * 3.1416
-                        * (2010 + self.S_phase + self.rng.random_float(4) - self.year)
-                        / 16
-                    )
+            if 0.5 * (
+                1
+                + math.sin(
+                    2 * 3.1416 * (2010 + self.S_phase + self.rng.random_float(4) - self.year) / 16
                 )
-                > self.rng.random_float(2 * self.S_spawning_failure)
-            ):
+            ) > self.rng.random_float(2 * self.S_spawning_failure):
                 for reef_idx in range(self.number_of_reefs):
                     self.spawn_cots(reef_idx)
 
@@ -518,7 +502,9 @@ class CoconetModel:
     def _load_reefs(self) -> None:
         path = Path(self.cfg.reefs_file)
         self.reef_df = pd.read_csv(path, low_memory=False)
-        self.reef_numeric = self.reef_df.apply(pd.to_numeric, errors="coerce").to_numpy(dtype=np.float64)
+        self.reef_numeric = self.reef_df.apply(pd.to_numeric, errors="coerce").to_numpy(
+            dtype=np.float64
+        )
 
         self.reef_id = self.reef_df.iloc[:, 1].astype(str).to_numpy()
         self.y = self.reef_numeric[:, 2]
@@ -861,7 +847,11 @@ class CoconetModel:
         self.B[sl] = b
 
         predation = (
-            self.G_pred_T * g_weighted * t / (t + self.G_pred_T * g_weighted + self.small) * np.exp(-1.0 * c_site)
+            self.G_pred_T
+            * g_weighted
+            * t
+            / (t + self.G_pred_T * g_weighted + self.small)
+            * np.exp(-1.0 * c_site)
         )
         t = t * (1 + self.T_recruit) - predation - self.T_recruit * t * t / self.T_max
         t = np.clip(t, 1.0, self.T_max * c_site)
@@ -946,20 +936,26 @@ class CoconetModel:
                     e3 = 0.0
                 if self.year >= self.cfg.start_upper_sizelimit:
                     e5 = 0.0
-                if self.year >= self.cfg.start_CoTSlimit and (
-                    0.55 * self.S_r["2"][reef_idx]
-                    + 0.70 * self.S_r["3"][reef_idx]
-                    + 0.85 * self.S_r["4"][reef_idx]
-                    + 0.95 * self.S_r["5"][reef_idx]
-                    + 0.99 * self.S_r["6"][reef_idx]
-                ) > 68:
+                if (
+                    self.year >= self.cfg.start_CoTSlimit
+                    and (
+                        0.55 * self.S_r["2"][reef_idx]
+                        + 0.70 * self.S_r["3"][reef_idx]
+                        + 0.85 * self.S_r["4"][reef_idx]
+                        + 0.95 * self.S_r["5"][reef_idx]
+                        + 0.99 * self.S_r["6"][reef_idx]
+                    )
+                    > 68
+                ):
                     e3 = e4 = e5 = 0.0
                 self.E["3"][reef_idx] = max(0, nl_round(self.E["3"][reef_idx] - e3))
                 self.E["4"][reef_idx] = max(0, nl_round(self.E["4"][reef_idx] - e4))
                 self.E["5"][reef_idx] = max(0, nl_round(self.E["5"][reef_idx] - e5))
                 catch = (
-                    e3 * kg_per_E_3 + e4 * kg_per_E_4 + e5 * kg_per_E_5
-                ) * self.reef_sites[reef_idx] * self.ha_per_site
+                    (e3 * kg_per_E_3 + e4 * kg_per_E_4 + e5 * kg_per_E_5)
+                    * self.reef_sites[reef_idx]
+                    * self.ha_per_site
+                )
                 self.E_catch_kg[reef_idx] += catch
                 e_cumulative += catch
 
@@ -984,20 +980,26 @@ class CoconetModel:
                     g3 = 0.0
                 if self.year >= self.cfg.start_upper_sizelimit:
                     g5 = 0.0
-                if self.year >= self.cfg.start_CoTSlimit and (
-                    0.55 * self.S_r["2"][reef_idx]
-                    + 0.70 * self.S_r["3"][reef_idx]
-                    + 0.85 * self.S_r["4"][reef_idx]
-                    + 0.95 * self.S_r["5"][reef_idx]
-                    + 0.99 * self.S_r["6"][reef_idx]
-                ) > 68:
+                if (
+                    self.year >= self.cfg.start_CoTSlimit
+                    and (
+                        0.55 * self.S_r["2"][reef_idx]
+                        + 0.70 * self.S_r["3"][reef_idx]
+                        + 0.85 * self.S_r["4"][reef_idx]
+                        + 0.95 * self.S_r["5"][reef_idx]
+                        + 0.99 * self.S_r["6"][reef_idx]
+                    )
+                    > 68
+                ):
                     g3 = g4 = g5 = 0.0
                 self.G["3"][reef_idx] = max(0, nl_round(self.G["3"][reef_idx] - g3))
                 self.G["4"][reef_idx] = max(0, nl_round(self.G["4"][reef_idx] - g4))
                 self.G["5"][reef_idx] = max(0, nl_round(self.G["5"][reef_idx] - g5))
                 catch = (
-                    g3 * kg_per_G_3 + g4 * kg_per_G_4 + g5 * kg_per_G_5
-                ) * self.reef_sites[reef_idx] * self.ha_per_site
+                    (g3 * kg_per_G_3 + g4 * kg_per_G_4 + g5 * kg_per_G_5)
+                    * self.reef_sites[reef_idx]
+                    * self.ha_per_site
+                )
                 self.G_catch_kg[reef_idx] += catch
                 g_cumulative += catch
 
@@ -1078,16 +1080,23 @@ class CoconetModel:
         self._seed_year()
         sl = self._sites_for_reef(reef_idx)
         for s in range(sl.start, sl.stop):
-            c_f = nl_median(0, self.C["sa"][s] + self.C["ta"][s] + self.C["mo"][s] + self.C["tt"][s], 1)
+            c_f = nl_median(
+                0, self.C["sa"][s] + self.C["ta"][s] + self.C["mo"][s] + self.C["tt"][s], 1
+            )
             site_cap = math.sqrt(c_f)
             old = {a: self.S[a][s] for a in ("0", "1", "2", "3", "4", "5", "6")}
-            self.S["6"][s] = nl_round((old["5"] + old["6"]) * math.exp(-1 * self.S6_mort / (c_f + self.small)))
+            self.S["6"][s] = nl_round(
+                (old["5"] + old["6"]) * math.exp(-1 * self.S6_mort / (c_f + self.small))
+            )
             self.S["5"][s] = nl_round(old["4"] * math.exp(-1 * self.S5_mort / (c_f + self.small)))
             self.S["4"][s] = nl_round(old["3"] * math.exp(-1 * self.S4_mort / (c_f + self.small)))
             self.S["3"][s] = nl_round(old["2"] * math.exp(-1 * self.S3_mort / (c_f + self.small)))
-            self.S["2"][s] = nl_round(old["1"] * site_cap * math.exp(-1 * self.S2_mort / (c_f + self.small)))
+            self.S["2"][s] = nl_round(
+                old["1"] * site_cap * math.exp(-1 * self.S2_mort / (c_f + self.small))
+            )
             self.S["1"][s] = nl_round(
-                (old["0"] + old["1"] * (1 - site_cap)) * math.exp(-1 * self.S1_mort / (self.R_site[s] + self.small))
+                (old["0"] + old["1"] * (1 - site_cap))
+                * math.exp(-1 * self.S1_mort / (self.R_site[s] + self.small))
             )
             self.S["0"][s] = 0
             self.S_manta[s] = (
@@ -1128,7 +1137,12 @@ class CoconetModel:
         sl = self._sites_for_reef(reef_idx)
         for s in range(sl.start, sl.stop):
             e_site = self.rng.random_int(2 * e_weighted)
-            pred = self.B_pred_S1 * self.B[s] * self.S["1"][s] / (self.S["1"][s] + self.B_pred_S1 * self.B[s] + self.small)
+            pred = (
+                self.B_pred_S1
+                * self.B[s]
+                * self.S["1"][s]
+                / (self.S["1"][s] + self.B_pred_S1 * self.B[s] + self.small)
+            )
             self.S["1"][s] = nl_round(max(10.0, self.S["1"][s] - pred))
             pred = (
                 self.E_pred_S1
@@ -1139,7 +1153,12 @@ class CoconetModel:
             )
             self.S["1"][s] = nl_ceiling(max(10.0, self.S["1"][s] - pred))
             for a in ("2", "3", "4", "5", "6"):
-                pred = self.E_pred_S * e_site * self.S[a][s] / (self.S[a][s] + self.E_pred_S * e_site + self.small)
+                pred = (
+                    self.E_pred_S
+                    * e_site
+                    * self.S[a][s]
+                    / (self.S[a][s] + self.E_pred_S * e_site + self.small)
+                )
                 self.S[a][s] = nl_ceiling(max(1.0, self.S[a][s] - pred))
 
     def spawn_fish(self, reef_idx: int) -> None:
@@ -1158,10 +1177,16 @@ class CoconetModel:
             (kernel.con1 + kernel.con2) * self.G_recruit * g_source * g_natal
         )
 
-        self._spawn_grouper_kernel(reef_idx, g_source, g_natal, kernel.con1, kernel.dir1, kernel.ang1, kernel.dis1)
-        self._spawn_grouper_kernel(reef_idx, g_source, g_natal, kernel.con2, kernel.dir2, kernel.ang2, kernel.dis2)
+        self._spawn_grouper_kernel(
+            reef_idx, g_source, g_natal, kernel.con1, kernel.dir1, kernel.ang1, kernel.dis1
+        )
+        self._spawn_grouper_kernel(
+            reef_idx, g_source, g_natal, kernel.con2, kernel.dir2, kernel.ang2, kernel.dis2
+        )
 
-        e_source = (self.E["4"][reef_idx] + 2 * self.E["5"][reef_idx]) * (1 - 0.004 * (self.y[reef_idx] + 25) ** 2)
+        e_source = (self.E["4"][reef_idx] + 2 * self.E["5"][reef_idx]) * (
+            1 - 0.004 * (self.y[reef_idx] + 25) ** 2
+        )
         self.E["0"][reef_idx] = self.rng.random_int(
             self.E_recruit * e_source * self.E_natal * self.reef_sites[reef_idx]
         )
@@ -1215,7 +1240,9 @@ class CoconetModel:
         )
 
         thermal_source = {g: self.thermal[g][src_site] for g in CORAL_GROUPS}
-        kernel = self._reef_kernel(reef_idx, self._kernel_base_coral(self.draw_year, self.draw_month))
+        kernel = self._reef_kernel(
+            reef_idx, self._kernel_base_coral(self.draw_year, self.draw_month)
+        )
         recruits_total = 0.0
 
         recruits_total += self._spawn_coral_kernel(
@@ -1354,22 +1381,36 @@ class CoconetModel:
 
     def spawn_cots(self, reef_idx: int) -> None:
         self._seed_year()
-        kernel = self._reef_kernel(reef_idx, self._kernel_base_cots(self.draw_year, self.draw_fortnight))
+        kernel = self._reef_kernel(
+            reef_idx, self._kernel_base_cots(self.draw_year, self.draw_fortnight)
+        )
         s_natal = self.rng.random_float(math.exp(-50 / math.sqrt(self.reef_sites[reef_idx])))
 
         sl = self._sites_for_reef(reef_idx)
         s_source = 0.0
         for s in range(sl.start, sl.stop):
-            adults = self.S["2"][s] + self.S["3"][s] + self.S["4"][s] + self.S["5"][s] + self.S["6"][s]
+            adults = (
+                self.S["2"][s] + self.S["3"][s] + self.S["4"][s] + self.S["5"][s] + self.S["6"][s]
+            )
             if adults > self.S_spawning_threshold:
-                s_source += self.S["2"][s] + 2 * self.S["3"][s] + 4 * self.S["4"][s] + 8 * self.S["5"][s] + 8 * self.S["6"][s]
+                s_source += (
+                    self.S["2"][s]
+                    + 2 * self.S["3"][s]
+                    + 4 * self.S["4"][s]
+                    + 8 * self.S["5"][s]
+                    + 8 * self.S["6"][s]
+                )
         for s in range(sl.start, sl.stop):
             self.S["0"][s] += self.rng.random_int(
                 (kernel.con1 + kernel.con2) * self.S_recruit * s_source * s_natal * self.R_site[s]
             )
 
-        self._spawn_cots_kernel(reef_idx, s_source, s_natal, kernel.con1, kernel.dir1, kernel.ang1, kernel.dis1)
-        self._spawn_cots_kernel(reef_idx, s_source, s_natal, kernel.con2, kernel.dir2, kernel.ang2, kernel.dis2)
+        self._spawn_cots_kernel(
+            reef_idx, s_source, s_natal, kernel.con1, kernel.dir1, kernel.ang1, kernel.dis1
+        )
+        self._spawn_cots_kernel(
+            reef_idx, s_source, s_natal, kernel.con2, kernel.dir2, kernel.ang2, kernel.dis2
+        )
 
     def _spawn_cots_kernel(
         self,
@@ -1393,7 +1434,9 @@ class CoconetModel:
             for s in range(sl.start, sl.stop):
                 self.S["0"][s] = min(
                     self.S["0"][s]
-                    + self.rng.random_int(con * self.S_recruit * s_source * (1 - s_natal) * self.R_site[s]),
+                    + self.rng.random_int(
+                        con * self.S_recruit * s_source * (1 - s_natal) * self.R_site[s]
+                    ),
                     1000000,
                 )
 
@@ -1408,12 +1451,19 @@ class CoconetModel:
                 continue
             if not self._reef_in_intervention_bounds(reef_idx):
                 continue
-            adults = self.E["2"][reef_idx] + self.E["3"][reef_idx] + self.E["4"][reef_idx] + self.E["5"][reef_idx]
+            adults = (
+                self.E["2"][reef_idx]
+                + self.E["3"][reef_idx]
+                + self.E["4"][reef_idx]
+                + self.E["5"][reef_idx]
+            )
             if adults >= self.cfg.release_threshold:
                 continue
             self.E["1"][reef_idx] = nl_round(
                 self.E["1"][reef_idx]
-                + self.cfg.release_number / max(self.cfg.release_reefs, 1) / (self.reef_sites[reef_idx] * self.ha_per_site)
+                + self.cfg.release_number
+                / max(self.cfg.release_reefs, 1)
+                / (self.reef_sites[reef_idx] * self.ha_per_site)
             )
             treatments += 1
 
@@ -1450,7 +1500,17 @@ class CoconetModel:
                 self.S["5"][s] = nl_round(0.05 * self.cfg.eco_threshold / diver_detect)
                 self.S["6"][s] = nl_round(0.01 * self.cfg.eco_threshold / diver_detect)
                 self.S["1"][s] = nl_round(
-                    min(self.S["1"][s], 2.77 * (self.S["2"][s] + self.S["3"][s] + self.S["4"][s] + self.S["5"][s] + self.S["6"][s]))
+                    min(
+                        self.S["1"][s],
+                        2.77
+                        * (
+                            self.S["2"][s]
+                            + self.S["3"][s]
+                            + self.S["4"][s]
+                            + self.S["5"][s]
+                            + self.S["6"][s]
+                        ),
+                    )
                 )
             self.dives_reef[reef_idx] += dives_total
 
@@ -1489,7 +1549,17 @@ class CoconetModel:
                 self.S["5"][s] = nl_round(0.05 * self.cfg.eco_threshold / diver_detect)
                 self.S["6"][s] = nl_round(0.01 * self.cfg.eco_threshold / diver_detect)
                 self.S["1"][s] = nl_round(
-                    min(self.S["1"][s], 2.77 * (self.S["2"][s] + self.S["3"][s] + self.S["4"][s] + self.S["5"][s] + self.S["6"][s]))
+                    min(
+                        self.S["1"][s],
+                        2.77
+                        * (
+                            self.S["2"][s]
+                            + self.S["3"][s]
+                            + self.S["4"][s]
+                            + self.S["5"][s]
+                            + self.S["6"][s]
+                        ),
+                    )
                 )
             self.dives_reef[reef_idx] += dives_total
 
@@ -1654,7 +1724,12 @@ class CoconetModel:
                 ((centre_dist[reef_idx] / self.per_km / bleaching_radius) ** 2),
                 1,
             )
-            self.dhw[reef_idx] = dhw_max * radial * (1 - self.reef_shading[reef_idx]) * (1 - self.regional_shading[reef_idx])
+            self.dhw[reef_idx] = (
+                dhw_max
+                * radial
+                * (1 - self.reef_shading[reef_idx])
+                * (1 - self.regional_shading[reef_idx])
+            )
             dhw_reef = self.dhw[reef_idx]
             sl = self._sites_for_reef(int(reef_idx))
             for s in range(sl.start, sl.stop):
@@ -1666,16 +1741,26 @@ class CoconetModel:
                     new_rubble += 2 * self.C[g][s] * mort
                     self.C[g][s] *= 1 - mort
                     self.thermal[g][s] *= (1 + self.adaptability) ** mort
-                    self.thermal[g][s] = min(self.thermal[g][s], self.thermal_i[g] + self.adapt_plasticity)
+                    self.thermal[g][s] = min(
+                        self.thermal[g][s], self.thermal_i[g] + self.adapt_plasticity
+                    )
 
                 self.R_site[s] = min(1.0, self.R_site[s] + new_rubble)
 
-                self.thermal["sa"][s] -= (self.thermal["sa"][s] - self.thermal_i["sa"]) / self.adapt_decay_time
-                self.rate["sa"][s] = self.rate_i["sa"] * (1 - self.adapt_penalty * (self.thermal["sa"][s] - self.thermal_i["sa"]))
+                self.thermal["sa"][s] -= (
+                    self.thermal["sa"][s] - self.thermal_i["sa"]
+                ) / self.adapt_decay_time
+                self.rate["sa"][s] = self.rate_i["sa"] * (
+                    1 - self.adapt_penalty * (self.thermal["sa"][s] - self.thermal_i["sa"])
+                )
                 for g in ("ta", "mo", "po", "fa", "tt"):
-                    decay = self.adapt_decay_time / ((self.rate[g][s] + self.small) / (self.rate["sa"][s] + self.small))
+                    decay = self.adapt_decay_time / (
+                        (self.rate[g][s] + self.small) / (self.rate["sa"][s] + self.small)
+                    )
                     self.thermal[g][s] -= (self.thermal[g][s] - self.thermal_i[g]) / decay
-                    self.rate[g][s] = self.rate_i[g] * (1 - self.adapt_penalty * (self.thermal[g][s] - self.thermal_i[g]))
+                    self.rate[g][s] = self.rate_i[g] * (
+                        1 - self.adapt_penalty * (self.thermal[g][s] - self.thermal_i[g])
+                    )
 
     def cyclone(self) -> None:
         self._seed_year()
@@ -1747,18 +1832,32 @@ class CoconetModel:
         affected = np.flatnonzero(d <= self.cyclone_radius)
         for reef_idx in affected:
             radial = 1 - nl_median(0, ((d[reef_idx] / self.per_km / self.cyclone_radius) ** 2), 1)
-            shelter = math.sqrt(self.reef_sites[reef_idx] * self.number_of_reefs / self.number_of_sites)
+            shelter = math.sqrt(
+                self.reef_sites[reef_idx] * self.number_of_reefs / self.number_of_sites
+            )
             sl = self._sites_for_reef(int(reef_idx))
             for s in range(sl.start, sl.stop):
                 rand = (0.7 + self.rng.random_float(0.3)) * radial / shelter
                 mort_max = rand * (0.25 * self.cyclone_category - 0.30)
                 mort_min = rand * max(0.0, 0.3 * self.cyclone_category - 0.9)
-                self.cyclone_mort["sa"][s] = (1.0 * mort_max + 0.0 * mort_min) * (self.rate_i["sa"] / self.rate["sa"][s])
-                self.cyclone_mort["ta"][s] = (0.9 * mort_max + 0.1 * mort_min) * (self.rate_i["ta"] / self.rate["ta"][s])
-                self.cyclone_mort["mo"][s] = (0.7 * mort_max + 0.3 * mort_min) * (self.rate_i["mo"] / self.rate["mo"][s])
-                self.cyclone_mort["po"][s] = (0.1 * mort_max + 0.9 * mort_min) * (self.rate_i["po"] / self.rate["po"][s])
-                self.cyclone_mort["fa"][s] = (0.0 * mort_max + 1.0 * mort_min) * (self.rate_i["fa"] / self.rate["fa"][s])
-                self.cyclone_mort["tt"][s] = (1.0 * mort_max + 0.0 * mort_min) * (self.rate_i["tt"] / self.rate["tt"][s])
+                self.cyclone_mort["sa"][s] = (1.0 * mort_max + 0.0 * mort_min) * (
+                    self.rate_i["sa"] / self.rate["sa"][s]
+                )
+                self.cyclone_mort["ta"][s] = (0.9 * mort_max + 0.1 * mort_min) * (
+                    self.rate_i["ta"] / self.rate["ta"][s]
+                )
+                self.cyclone_mort["mo"][s] = (0.7 * mort_max + 0.3 * mort_min) * (
+                    self.rate_i["mo"] / self.rate["mo"][s]
+                )
+                self.cyclone_mort["po"][s] = (0.1 * mort_max + 0.9 * mort_min) * (
+                    self.rate_i["po"] / self.rate["po"][s]
+                )
+                self.cyclone_mort["fa"][s] = (0.0 * mort_max + 1.0 * mort_min) * (
+                    self.rate_i["fa"] / self.rate["fa"][s]
+                )
+                self.cyclone_mort["tt"][s] = (1.0 * mort_max + 0.0 * mort_min) * (
+                    self.rate_i["tt"] / self.rate["tt"][s]
+                )
                 self.R_site[s] = nl_median(
                     0.0,
                     1.0,
@@ -1845,7 +1944,10 @@ class CoconetModel:
                 self.S_vessels = self.cfg.CoTS_vessels_sector
                 self.control_cots_by_sector()
 
-        if np.count_nonzero((self.year < self.rezone_year) & (self.year < self.future_rezone_year)) > 0:
+        if (
+            np.count_nonzero((self.year < self.rezone_year) & (self.year < self.future_rezone_year))
+            > 0
+        ):
             self.apply_fishing()
 
         if self.year >= self.cfg.start_catchment_restore and self.cfg.restore_timeframe > 0:
@@ -1876,7 +1978,9 @@ class CoconetModel:
                 for age in ("2", "3", "4", "5", "6"):
                     self.S[age][sl] = 0
         if mode == "Coral-replenishment":
-            for reef_idx in np.flatnonzero((self.priority <= 100 * self.ensemble) & (self.C_reef < 0.2)):
+            for reef_idx in np.flatnonzero(
+                (self.priority <= 100 * self.ensemble) & (self.C_reef < 0.2)
+            ):
                 sl = self._sites_for_reef(int(reef_idx))
                 idxs = np.flatnonzero(self.C_site[sl] < 0.2) + sl.start
                 for s in idxs:
@@ -1886,7 +1990,9 @@ class CoconetModel:
                     self.C["po"][s] += 0.01
                     self.C["fa"][s] += 0.01
         if mode == "Coral-enhancement":
-            for reef_idx in np.flatnonzero((self.priority <= 100 * self.ensemble) & (self.C_reef < 0.2)):
+            for reef_idx in np.flatnonzero(
+                (self.priority <= 100 * self.ensemble) & (self.C_reef < 0.2)
+            ):
                 sl = self._sites_for_reef(int(reef_idx))
                 idxs = np.flatnonzero(self.C_site[sl] < 0.2) + sl.start
                 self.C["tt"][idxs] += 0.01
@@ -1967,7 +2073,9 @@ class CoconetModel:
         lines.append("")
         lines.append(f"Upper fish size limit start year, {self.cfg.start_upper_sizelimit}")
         lines.append(f"Lower fish size limit start year, {self.cfg.start_lower_sizelimit}")
-        lines.append(f"Exclude fishing from active outbreak reefs start year, {self.cfg.start_CoTSlimit}")
+        lines.append(
+            f"Exclude fishing from active outbreak reefs start year, {self.cfg.start_CoTSlimit}"
+        )
         lines.append("")
         lines.append(f"Emperor release start year, {self.cfg.start_emperor_release}")
         lines.append(f"Number of release reefs, {self.cfg.release_reefs}")
@@ -1975,7 +2083,9 @@ class CoconetModel:
         lines.append(f"Number of juvenile emperors released per reef, {self.cfg.release_number}")
         lines.append("")
         lines.append(f"Regional shading start year, {self.cfg.start_regional_shading}")
-        lines.append(f"Absolute DHW reduction due to regional shading (DHW), {self.cfg.regional_shading_reduction}")
+        lines.append(
+            f"Absolute DHW reduction due to regional shading (DHW), {self.cfg.regional_shading_reduction}"
+        )
         lines.append("")
         lines.append(f"Minimum longitude of interventions, {self.cfg.intervene_lon_min}")
         lines.append(f"Maximum longitude of interventions, {self.cfg.intervene_lon_max}")
@@ -1984,12 +2094,16 @@ class CoconetModel:
         lines.append("")
         lines.append(f"Rubble consolidation start year, {self.cfg.start_rubble_consolidation}")
         lines.append(f"Annual number of consolidated reefs, {self.cfg.consolidation_reefs}")
-        lines.append(f"Minimum rubble cover threshold for consolidation [0 1], {self.cfg.consolidation_threshold}")
+        lines.append(
+            f"Minimum rubble cover threshold for consolidation [0 1], {self.cfg.consolidation_threshold}"
+        )
         lines.append(f"Total annual consolidated area (ha) , {self.cfg.consolidation_hectares}")
         lines.append("")
         lines.append(f"Thermally tolerant coral seeding start year, {self.cfg.start_coral_seeding}")
         lines.append(f"Annual number of reefs seeded with coral, {self.cfg.seed_reefs}")
-        lines.append(f"Maximum coral cover threshold for coral seeding [0 1], {self.cfg.seed_threshold}")
+        lines.append(
+            f"Maximum coral cover threshold for coral seeding [0 1], {self.cfg.seed_threshold}"
+        )
         lines.append(f"Total annual area of seeded corals (ha), {self.cfg.seed_hectares}")
         lines.append(
             "Fraction of staghorn acropora corals able to hybridise with thermally tolerant corals [0 1], "
@@ -2002,16 +2116,22 @@ class CoconetModel:
         lines.append("")
         lines.append(f"Coral slicks start year, {self.cfg.start_coral_slick}")
         lines.append(f"Annual number of reefs with coral slicks released, {self.cfg.slick_reefs}")
-        lines.append(f"Maximum coral cover threshold for coral slicks [0 1], {self.cfg.slick_threshold}")
+        lines.append(
+            f"Maximum coral cover threshold for coral slicks [0 1], {self.cfg.slick_threshold}"
+        )
         lines.append(f"Total annual area of slick corals (ha), {self.cfg.slick_hectares}")
         lines.append("")
         lines.append(f"Reef shading start year, {self.cfg.start_reef_shading}")
         lines.append(f"Annual number of reefs locally shaded, {self.cfg.shading_reefs}")
-        lines.append(f"Fractional DHW reduction due to local shading [0 1], {self.cfg.reef_shading_reduction}")
+        lines.append(
+            f"Fractional DHW reduction due to local shading [0 1], {self.cfg.reef_shading_reduction}"
+        )
         lines.append("")
         lines.append(f"Ocean acidification treatment start year, {self.cfg.start_pH_protection}")
         lines.append(f"Annual number of reefs treated for ocean acidification, {self.cfg.pH_reefs}")
-        lines.append(f"Fractional protection from ocean acidification [0 1], {self.cfg.pH_protection}")
+        lines.append(
+            f"Fractional protection from ocean acidification [0 1], {self.cfg.pH_protection}"
+        )
         lines.append("")
         lines.append(f"CoTS vessels in active sector, {self.cfg.CoTS_vessels_sector}")
         lines.append("")

@@ -23,6 +23,16 @@ defaults:
       path: ""
     values:
       layout: default
+  # Pretty paths (…/page/index.html) so GitHub Pages serves /repo/page/ without 404.
+  - scope:
+      path: ""
+      type: pages
+    values:
+      permalink: /:basename/
+  - scope:
+      path: "index.md"
+    values:
+      permalink: /
 
 exclude:
   - Gemfile

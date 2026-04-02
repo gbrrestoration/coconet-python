@@ -23,5 +23,60 @@ coconet = "coconet.cli:main"
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+  "mypy>=1.13.0",
+  "pandas-stubs>=2.2.0",
+  "ruff>=0.9.0",
+  "types-PyYAML>=6.0.0",
+]
+
 [tool.uv]
 package = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["coconet", "scripts"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # isort
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
+  "SIM", # flake8-simplify
+  "RUF", # Ruff-specific
+]
+ignore = [
+  "E501", # line length (handled by formatter tolerance; long strings in model)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["coconet", "scripts"]
+show_error_codes = true
+pretty = true
+warn_unused_ignores = true
+warn_return_any = true
+strict = false
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+  "pyinstrument.*",
+  "threadpoolctl.*",
+]
+ignore_missing_imports = true
+
+# The simulation engine assigns hundreds of lazily initialized ndarrays on `self`;
+# typing that state machine tightly would be a large, separate refactor.
+[[tool.mypy.overrides]]
+module = "coconet.model"
+ignore_errors = true

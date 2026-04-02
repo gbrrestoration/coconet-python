@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
-from pathlib import Path
 import csv
 import os
+from dataclasses import dataclass, fields
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -137,7 +137,7 @@ class CoconetConfig:
         config_file: str | Path | None = None,
         parameter_file: str | Path | None = None,
         env_prefix: str = "COCONET_",
-    ) -> "CoconetConfig":
+    ) -> CoconetConfig:
         config = cls()
 
         if config_file is not None:
@@ -231,10 +231,9 @@ class CoconetConfig:
                 if len(row) < 2:
                     continue
                 label = row[0].strip().lower()
-                if label.startswith("ensemble"):
-                    # Header for output table marks end of config lines.
-                    if row[0].strip().lower() == "ensemble":
-                        break
+                # Header row "ensemble" marks end of config lines (not e.g. "ensemble runs").
+                if label.startswith("ensemble") and label == "ensemble":
+                    break
                 attr = label_to_attr.get(label)
                 if attr is None:
                     continue

@@ -1,0 +1,34 @@
+name: Lint and typecheck
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff-mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (including dev)
+        run: uv sync --frozen --group dev
+
+      - name: Ruff lint
+        run: uv run ruff check coconet scripts
+
+      - name: Ruff format
+        run: uv run ruff format --check coconet scripts
+
+      - name: Mypy
+        run: uv run mypy

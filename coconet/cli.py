@@ -218,7 +218,10 @@ def main() -> None:
             )
         if args.profile_interval <= 0:
             parser.error("--profile-interval must be positive.")
-        if args.profile_html_resample_interval is not None and args.profile_html_resample_interval < 0:
+        if (
+            args.profile_html_resample_interval is not None
+            and args.profile_html_resample_interval < 0
+        ):
             parser.error(
                 "--profile-html-resample-interval must be non-negative "
                 "(0 disables HTML resampling)."
