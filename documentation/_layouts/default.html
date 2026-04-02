@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {% seo %}
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="site-title" href="{{ '/' | relative_url }}">{{ site.title }}</a>
+        <nav class="site-nav" aria-label="Primary">
+          <ul>
+            <li><a href="{{ '/' | relative_url }}">Home</a></li>
+            <li><a href="{{ '/getting-started/' | relative_url }}">Getting started</a></li>
+            <li><a href="{{ '/configuration/' | relative_url }}">Configuration</a></li>
+            <li><a href="{{ '/scenario-parameters/' | relative_url }}">Parameters</a></li>
+            <li><a href="{{ '/cli/' | relative_url }}">CLI</a></li>
+            <li><a href="{{ '/python-api/' | relative_url }}">Python API</a></li>
+            <li><a href="{{ '/inputs-and-outputs/' | relative_url }}">I/O</a></li>
+            <li><a href="{{ '/model-overview/' | relative_url }}">Model</a></li>
+            <li><a href="{{ '/architecture/' | relative_url }}">Architecture</a></li>
+            <li><a href="{{ '/porting-notes/' | relative_url }}">Porting</a></li>
+            <li><a href="{{ '/related-tools/' | relative_url }}">Tools</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <main id="main" class="site-main">
+      <article class="prose">
+        <h1>{{ page.title }}</h1>
+        {{ content }}
+      </article>
+    </main>
+    <footer class="site-footer">
+      <p>
+        CoCoNet Python documentation —
+        {% if site.repo_web_url %}
+        <a href="{{ site.repo_web_url }}">Source on GitHub</a>
+        {% endif %}
+      </p>
+    </footer>
+  </body>
+</html>

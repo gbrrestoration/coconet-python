@@ -1,128 +1,21 @@
-# CoCoNet Python Port
+---
+title: Scenario parameter semantics
+description: Legacy CSV labels, CoconetConfig fields, and the role of each scenario knob (from the repository README).
+---
 
-This repository contains a headless Python port of the legacy NetLogo CoCoNet model.
+This page documents how **legacy parameter CSV** rows map to **`CoconetConfig`** and what each control does in the model. It mirrors the authoritative discussion in the repository README so users can read scenarios without leaving the docs site.
 
-**User documentation (Jekyll):** the [`documentation/`](documentation/) directory holds a static site with installation, configuration, API, and I/O reference. On GitHub, enable **Settings → Pages → GitHub Actions**; pushes to `main` then publish to `https://<owner>.github.io/<repo>/` via the “Deploy documentation to GitHub Pages” workflow.
+For load order (YAML, CSV, environment), see [Configuration]({% link configuration.md %}). For the Python `label_to_attr` map, see `coconet/config.py`.
 
-## Why this exists
-
-The `legacy/` directory contains the original monolithic NetLogo model (`CoCoNet V3_rubble.nlogo`) and its data files. This port migrates the model to a modern Python stack for:
-
-- headless execution in cloud/CI environments,
-- typed, maintainable code,
-- easier configuration through files and environment variables,
-- reproducible scenario runs without a GUI.
-
-## Project layout
-
-- `legacy/` - original NetLogo model and data files.
-- `coconet/` - Python implementation:
-  - `config.py` - typed configuration and legacy parameter CSV parsing,
-  - `model.py` - simulation engine (ported procedures),
-  - `cli.py` - command line entry point.
-
-## Running with uv
-
-```bash
-uv sync
-uv run coconet --parameter-file legacy/I_2p6.csv --output-file output.csv
-```
-
-You can also use YAML config:
-
-```bash
-uv run coconet --config config/example.yaml --output-file output.csv
-```
-
-## Docker (GitHub Container Registry)
-
-A container image is built with [GitHub Actions](.github/workflows/docker-publish.yml) on pushes to the default branch (`main`) and on SemVer tags `v*`. It is published to **GitHub Container Registry** as [`ghcr.io/gbrrestoration/coconet-python`](https://github.com/gbrrestoration/coconet-python/pkgs/container/coconet-python) (pull: `docker pull ghcr.io/gbrrestoration/coconet-python:latest`).
-
-The image is based on `python:3.12-slim-bookworm`, installs dependencies with **uv** (`uv sync --frozen`), bundles `legacy/` and `config/` under `/app`, and runs as UID **1000**. The container entrypoint is the `coconet` CLI.
-
-### Input and output paths
-
-Point the CLI at inputs and outputs using flags (or YAML / environment variables). For data on the host, mount a host directory into the container and pass **container paths** to the CLI.
-
-| Item | CLI flags | Environment (optional) |
-| --- | --- | --- |
-| Reef table CSV | `--reefs-file` | `COCONET_REEFS_FILE` |
-| Coastline CSV | `--coastline-file` | `COCONET_COASTLINE_FILE` |
-| Scenario YAML | `--config` | (YAML keys `reefs_file`, `coastline_file`, …) |
-| Legacy parameter CSV | `--parameter-file` | (set via YAML `parameter_file` if needed) |
-| Run output CSV | `--output-file` | `COCONET_OUTPUT_FILE` |
-
-**Example: bundled inputs, outputs on the host**
-
-```bash
-mkdir -p ./out
-docker run --rm \
-  -v "$(pwd)/out:/out" \
-  ghcr.io/gbrrestoration/coconet-python:latest \
-  --config /app/config/example.yaml \
-  --output-file /out/run.csv
-```
-
-**Example: custom inputs and outputs on the host**
-
-```bash
-mkdir -p ./out
-docker run --rm \
-  -v "/path/to/mydata:/data:ro" \
-  -v "$(pwd)/out:/out" \
-  ghcr.io/gbrrestoration/coconet-python:latest \
-  --reefs-file /data/reefs2024.csv \
-  --coastline-file /data/coastline.csv \
-  --parameter-file /data/myparams.csv \
-  --output-file /out/results.csv
-```
-
-Use `-e COCONET_ENSEMBLE_RUNS=2` (and other `COCONET_*` variables) if you prefer environment overrides; see below. Run `docker run --rm ghcr.io/gbrrestoration/coconet-python:latest --help` for all CLI options.
-
-**Permissions:** the process in the image runs as UID **1000** (`coconet`). Writable bind mounts (for `--output-file`, profiling output, etc.) must allow that user to create files—for example `sudo chown 1000:1000 ./out` on the host directory, or a Docker volume instead of a root-owned host path. Overriding with `--user` is not recommended because `/app` in the image is not world-readable.
-
-Environment overrides are supported with `COCONET_` prefix, for example:
-
-```bash
-export COCONET_ENSEMBLE_RUNS=2
-export COCONET_END_YEAR=1990
-uv run coconet --parameter-file legacy/I_2p6.csv
-```
-
-## Logging
-
-The CLI includes lifecycle logging for setup, progress, and run completion.
-
-You can control logging level with either CLI or environment variables:
-
-```bash
-uv run coconet --config config/example.yaml --log-level DEBUG
-```
-
-```bash
-export COCONET_LOG_LEVEL=WARNING
-uv run coconet --config config/example.yaml
-```
-
-Supported levels are: `CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`.
-
-If both are provided, CLI takes precedence over the environment variable.
-
-## Notes on parity
-
-The implementation ports the NetLogo procedures and keeps important NetLogo semantics where feasible (seed resets, annual loop structure, reef/site-level state updates, interventions, and output schema). This is designed to support model-output comparison workflows between the legacy and Python implementations.
-
-## Legacy parameter CSV (`--parameter-file`)
-
-The documentation site (Jekyll under `documentation/`, page **Scenario parameter semantics**) carries the same tables as the following sections for easier browsing once GitHub Pages is enabled.
+## Legacy parameter CSV rules
 
 Rows are `Label, value` pairs. Blank lines are skipped. Parsing is **case-insensitive** on the label. The first row whose first cell is exactly `Ensemble` (the output table header) ends the config block; everything after that is treated as data rows, not parameters.
 
-Labels are mapped in `coconet/config.py` (`label_to_attr`). If a label from a template file is **missing**, the value stays at the Python default in `CoconetConfig` (for example `legacy/I_2p6.csv` has no `Spinup backtrack (years)` row, so the default `50` is used, and no `CoTS vessels in active sector` row, so default `0` is used).
+If a label is **missing** from a template file, the value stays at the Python default in `CoconetConfig`.
 
 **YAML / environment-only** (not read from the legacy CSV): `reefs_file`, `coastline_file`, `output_file`, `ensemble_threads`, `log_level`, `search_mode`, `perfect_intervention`, `unregulated_fishing`. Override these via `--config`, `COCONET_*` env vars, or CLI flags (`--reefs-file`, `--coastline-file`, `--output-file`, …) where supported.
 
-### Simulation schedule
+## Simulation schedule
 
 | Legacy CSV label | `CoconetConfig` field | Role |
 | --- | --- | --- |
@@ -135,7 +28,7 @@ Labels are mapped in `coconet/config.py` (`label_to_attr`). If a label from a te
 | End year | `end_year` | Last calendar year in the main annual loop. |
 | Search year | `search_year` | When `search_mode == 1`, used to switch search behaviour and benefit accumulation (optimization-style mode; default `search_mode` is `0`). |
 
-### Crown-of-thorns (CoTS) control
+## Crown-of-thorns (CoTS) control
 
 All CoTS control logic runs only when `year >= start_CoTS_control`. Vessel counts set how many control “vessels” are simulated for that annual step; **each non-zero regional/GBR/sector option runs its own control pass** in sequence (separate dive budgets). Intervention reefs are still filtered by region for the regional modes.
 
@@ -152,7 +45,7 @@ All CoTS control logic runs only when `year >= start_CoTS_control`. Vessel count
 | CoTS vessels in Southern Region | `CoTS_vessels_S` | Same for region `S`. |
 | CoTS vessels in active sector | `CoTS_vessels_sector` | Vessel count for `control_cots_by_sector()`: targets the sector (1–11) with highest mean CoTS; uses a slightly different dive-cost formula than regional control. |
 
-### Catchment, zoning, and fishing
+## Catchment, zoning, and fishing
 
 | Legacy CSV label | `CoconetConfig` field | Role |
 | --- | --- | --- |
@@ -166,7 +59,7 @@ All CoTS control logic runs only when `year >= start_CoTS_control`. Vessel count
 | Lower fish size limit start year | `start_lower_sizelimit` | From this year, fishing removes no `E_3` / `G_3` (smallest targeted ages). |
 | Exclude fishing from active outbreak reefs start year | `start_CoTSlimit` | From this year, if a weighted CoTS outbreak index on the reef exceeds `68`, all targeted emperor/trout catch on that visit is set to zero. |
 
-### Other species and shading
+## Other species and shading
 
 | Legacy CSV label | `CoconetConfig` field | Role |
 | --- | --- | --- |
@@ -177,7 +70,7 @@ All CoTS control logic runs only when `year >= start_CoTS_control`. Vessel count
 | Regional shading start year | `start_regional_shading` | First year `shade_regional_coral()` runs. |
 | Absolute DHW reduction due to regional shading (DHW) | `regional_shading_reduction` | For reefs inside the intervention bounding box, bleaching DHW is multiplied by `(1 - regional_shading[reef])` after this value is assigned (same multiplicative pattern as local shading; legacy label says “absolute” but the implementation scales DHW). |
 
-### Intervention bounding box
+## Intervention bounding box
 
 Applied to most spatial interventions (not CoTS regional control, which uses reef region codes). Reef centre must satisfy `intervene_lon_min < x < intervene_lon_max` and `intervene_lat_min < y < intervene_lat_max`.
 
@@ -188,7 +81,7 @@ Applied to most spatial interventions (not CoTS regional control, which uses ree
 | Minimum latitude of interventions | `intervene_lat_min` |
 | Maximum latitude of interventions | `intervene_lat_max` |
 
-### Rubble, coral seeding, slicks, local shading, ocean acidification
+## Rubble, coral seeding, slicks, local shading, ocean acidification
 
 | Legacy CSV label | `CoconetConfig` field | Role |
 | --- | --- | --- |
@@ -213,10 +106,14 @@ Applied to most spatial interventions (not CoTS regional control, which uses ree
 | Annual number of reefs treated for ocean acidification | `pH_reefs` | Reefs per year receive `pH_protect[reef] = pH_protection`. |
 | Fractional protection from ocean acidification [0 1] | `pH_protection` | From `projection_year` onward, coral growth uses `pH_effect_t = (1 - pH_protect[reef]) * sqrt(SSP)`. |
 
-### Search mode and “perfect” interventions
+## Search mode and “perfect” interventions
 
 - **`search_mode`** (`0` default): normal output; `1` enables search-year logic and benefit tracking (see `model.py`).
 - **`perfect_intervention`**: string mode applied from year **2026** onward (`_apply_perfect_intervention`), e.g. idealised starfish control or shading (not set via legacy CSV).
 - **`unregulated_fishing`**: if true, sets zoning years so fishing regulation drivers are bypassed.
 
-For the exact equations, see the corresponding methods on `CoconetModel` in `coconet/model.py` and the label map in `coconet/config.py`.
+For exact equations, see the corresponding methods on `CoconetModel` in `coconet/model.py` and the label map in `coconet/config.py`.
+
+## Docker image (optional runs)
+
+The README also documents running published **`ghcr.io`** images with bind mounts and optional `COCONET_*` environment variables. See the **Docker** section in the [repository README]({{ site.repo_web_url }}/blob/main/README.md).

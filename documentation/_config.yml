@@ -1,0 +1,31 @@
+# Published base URL is set at build time in CI: bundle exec jekyll build --baseurl "/<repo>"
+title: CoCoNet (Python)
+description: >-
+  User documentation for the headless Python port of the CoCoNet Great Barrier Reef
+  simulation model (legacy NetLogo CoCoNet v3).
+url: ""
+# baseurl filled by GitHub Actions (repository name). For local preview: jekyll serve --baseurl ""
+baseurl: ""
+# Footer link; update when you fork.
+repo_web_url: "https://github.com/gbrrestoration/coconet-python"
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - vendor

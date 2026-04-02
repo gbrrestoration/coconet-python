@@ -37,6 +37,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output CSV file path.",
     )
     parser.add_argument(
+        "--reefs-file",
+        type=Path,
+        default=None,
+        help="Reef attribute / spatial input CSV. Overrides config and COCONET_REEFS_FILE.",
+    )
+    parser.add_argument(
+        "--coastline-file",
+        type=Path,
+        default=None,
+        help="Coastline input CSV. Overrides config and COCONET_COASTLINE_FILE.",
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         default=None,
@@ -169,6 +181,10 @@ def main() -> None:
 
     if args.output_file is not None:
         config.output_file = str(args.output_file)
+    if args.reefs_file is not None:
+        config.reefs_file = str(args.reefs_file)
+    if args.coastline_file is not None:
+        config.coastline_file = str(args.coastline_file)
     if args.log_level is not None:
         config.log_level = args.log_level
     if args.ensemble_threads is not None:
@@ -182,8 +198,11 @@ def main() -> None:
 
     logger = logging.getLogger(__name__)
     logger.info(
-        "Starting CoCoNet run: log_level=%s output_file=%s config_file=%s parameter_file=%s",
+        "Starting CoCoNet run: log_level=%s reefs_file=%s coastline_file=%s "
+        "output_file=%s config_file=%s parameter_file=%s",
         effective_log_level,
+        config.reefs_file,
+        config.coastline_file,
         config.output_file,
         args.config,
         args.parameter_file,
