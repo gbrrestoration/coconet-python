@@ -1,6 +1,6 @@
 [project]
 name = "coconet-python"
-version = "0.4.1"
+version = "0.4.2"
 description = "Headless Python port of the legacy CoCoNet NetLogo model."
 readme = "README.md"
 requires-python = ">=3.11"
