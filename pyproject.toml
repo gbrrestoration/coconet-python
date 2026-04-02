@@ -31,8 +31,16 @@ packages = ["coconet"]
 dev = [
   "mypy>=1.13.0",
   "pandas-stubs>=2.2.0",
+  "pytest>=8.3.0",
   "ruff>=0.9.0",
   "types-PyYAML>=6.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers"]
+markers = [
+  "integration: end-to-end run_coconet on the mini reef fixture",
 ]
 
 [tool.uv]
@@ -48,7 +56,7 @@ explicit = true
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["coconet", "scripts"]
+src = ["coconet", "scripts", "tests"]
 
 [tool.ruff.lint]
 select = [
