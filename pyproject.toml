@@ -15,9 +15,15 @@ dependencies = [
 profile = [
   "pyinstrument>=5.0.0",
 ]
+gui = [
+  "pyinstaller>=6.11.0",
+  "pywebview>=5.4.0",
+]
 
 [project.scripts]
 coconet = "coconet.cli:main"
+coconet-gui = "coconet.gui:main"
+coconet-viz = "coconet.viz_viewer:main"
 
 [project.urls]
 Homepage = "https://github.com/gbrrestoration/coconet-python"
@@ -97,6 +103,7 @@ explicit_package_bases = true
 module = [
   "pyinstrument.*",
   "threadpoolctl.*",
+  "webview.*",
 ]
 ignore_missing_imports = true
 

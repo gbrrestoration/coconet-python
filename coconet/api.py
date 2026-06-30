@@ -16,6 +16,7 @@ from typing import Any
 from coconet.config import CoconetConfig
 from coconet.logging_utils import configure_logging
 from coconet.model import CoconetModel
+from coconet.run_control import RunController
 
 __all__ = [
     "CoconetRunResult",
@@ -85,6 +86,7 @@ def run_coconet(
     *,
     configure_logs: bool = False,
     log_level: str | None = None,
+    run_control: RunController | None = None,
 ) -> CoconetRunResult:
     """Run the simulation for ``config`` and return basic result metadata.
 
@@ -104,7 +106,7 @@ def run_coconet(
         config.coastline_file,
         config.output_file,
     )
-    model = CoconetModel(config)
+    model = CoconetModel(config, run_control=run_control)
     model.run()
     logger.debug("CoCoNet run finished: output_file=%s", config.output_file)
     return CoconetRunResult(output_file=config.output_file)

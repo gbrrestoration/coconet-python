@@ -8,6 +8,7 @@ import tempfile
 import time
 from collections.abc import Iterable
 from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from coconet.config import (
 )
 from coconet.logging_utils import configure_logging
 from coconet.netlogo import NetLogoRng, heading_from_dx_dy, nl_ceiling, nl_median, nl_round
+from coconet.run_control import RunController, RunStopped
 
 CORAL_GROUPS = ("sa", "ta", "mo", "po", "fa", "tt")
 # Coral larval kernel inner loop order in spawn (legacy NetLogo). RNG must draw
@@ -59,8 +61,9 @@ class SpinupCheckpoint:
 class CoconetModel:
     """Python port of legacy CoCoNet NetLogo model."""
 
-    def __init__(self, config: CoconetConfig) -> None:
+    def __init__(self, config: CoconetConfig, *, run_control: RunController | None = None) -> None:
         self.cfg = config
+        self._run_control = run_control
         self.rng = NetLogoRng(1)
 
         # Globals
@@ -291,8 +294,13 @@ class CoconetModel:
                 )
             self._run_sequential_ensemble_loop(run_start)
 
+    def _checkpoint(self) -> None:
+        if self._run_control is not None:
+            self._run_control.checkpoint()
+
     def _run_sequential_ensemble_loop(self, run_start: float) -> None:
         while self.ensemble <= self.cfg.ensemble_runs:
+            self._checkpoint()
             ensemble_start = time.perf_counter()
             ensemble_kind = "spinup" if self.ensemble == 0 else "simulation"
             logger.info(
@@ -338,25 +346,30 @@ class CoconetModel:
 
         checkpoint = self.export_spinup_checkpoint()
         tmpdir = Path(tempfile.mkdtemp(prefix="coconet-ensemble-"))
+        ctx = mp.get_context("spawn")
+        executor = ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx)
         try:
             futures: dict[int, Future[None]] = {}
-            # spawn: fresh interpreters so we do not fork a huge post-spinup parent;
-            # threads were wrong here — Python bytecode in the year loop holds the GIL.
-            ctx = mp.get_context("spawn")
-            with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
-                for e in range(1, self.cfg.ensemble_runs + 1):
-                    out_part = tmpdir / f"output_{e}.csv"
-                    pri_part = tmpdir / f"priority_{e}.csv" if self.search_mode == 1 else None
-                    futures[e] = executor.submit(
-                        _run_simulation_ensemble_worker,
-                        replace(self.cfg),
-                        checkpoint,
-                        e,
-                        out_part,
-                        pri_part,
-                    )
-                for e in range(1, self.cfg.ensemble_runs + 1):
-                    futures[e].result()
+            for e in range(1, self.cfg.ensemble_runs + 1):
+                self._checkpoint()
+                out_part = tmpdir / f"output_{e}.csv"
+                pri_part = tmpdir / f"priority_{e}.csv" if self.search_mode == 1 else None
+                futures[e] = executor.submit(
+                    _run_simulation_ensemble_worker,
+                    replace(self.cfg),
+                    checkpoint,
+                    e,
+                    out_part,
+                    pri_part,
+                )
+            for e in range(1, self.cfg.ensemble_runs + 1):
+                while True:
+                    self._checkpoint()
+                    try:
+                        futures[e].result(timeout=0.5)
+                        break
+                    except FuturesTimeoutError:
+                        continue
 
             with self.output_file.open("ab") as out_f:
                 for e in range(1, self.cfg.ensemble_runs + 1):
@@ -373,6 +386,15 @@ class CoconetModel:
                         if part.is_file():
                             with part.open("rb") as in_f:
                                 shutil.copyfileobj(in_f, out_f)
+        except RunStopped:
+            logger.info(
+                "Run stopped during parallel ensemble phase; in-flight worker processes "
+                "may continue until they finish their current ensemble.",
+            )
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+        else:
+            executor.shutdown(wait=True)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -421,6 +443,7 @@ class CoconetModel:
 
     def _run_ensemble_year_steps(self) -> None:
         while self.year <= self.cfg.end_year:
+            self._checkpoint()
             logger.info(
                 "Progress: ensemble=%s year=%s",
                 self.ensemble,

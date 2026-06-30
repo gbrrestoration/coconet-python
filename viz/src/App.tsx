@@ -54,6 +54,7 @@ import {
   SAFE_FULL_READ_BYTES,
 } from "./readModelOutputFile";
 import { streamCoCoNetFromFile } from "./streamCoCoNetFile";
+import { useEmbeddedMode, useEmbeddedOutput } from "./useEmbeddedOutput";
 
 const REGION_LINE_COLORS = [
   "#22d3ee",
@@ -92,6 +93,7 @@ function parseDebugEnabled(): boolean {
 }
 
 export default function App() {
+  const embedded = useEmbeddedMode();
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [parseDiagnostics, setParseDiagnostics] =
@@ -266,6 +268,8 @@ export default function App() {
     [applyParsedOutput],
   );
 
+  const embeddedLoading = useEmbeddedOutput(embedded, loadText, setError);
+
   const handleReadFailure = useCallback((f: File, err: unknown) => {
     console.error("[coconet-viz] file read/parse failed", err);
     setFileName(f.name);
@@ -332,34 +336,58 @@ export default function App() {
           CoCoNet output
         </h1>
         <p className="mt-1 text-sm text-slate-400">
-          Drop a model <code className="text-cyan-400/90">output.csv</code>{" "}
-          (preamble + reef table) to explore means by year and region. Files larger
-          than ~180&nbsp;MiB are parsed in chunks (no whole-file string); all rows are
-          still held in memory for the charts, so very large runs can hit RAM limits.
-          Add <code className="text-cyan-400/90">?debug=1</code> to the URL or set{" "}
-          <code className="text-cyan-400/90">localStorage.coconetVizParseDebug=1</code>{" "}
-          for verbose parse logging.
+          {embedded ? (
+            <>
+              Charts loaded from your CoCoNet desktop run. You can still drop a
+              different <code className="text-cyan-400/90">output.csv</code> below
+              to compare scenarios.
+            </>
+          ) : (
+            <>
+              Drop a model <code className="text-cyan-400/90">output.csv</code>{" "}
+              (preamble + reef table) to explore means by year and region. Files
+              larger than ~180&nbsp;MiB are parsed in chunks (no whole-file
+              string); all rows are still held in memory for the charts, so very
+              large runs can hit RAM limits. Add{" "}
+              <code className="text-cyan-400/90">?debug=1</code> to the URL or
+              set{" "}
+              <code className="text-cyan-400/90">
+                localStorage.coconetVizParseDebug=1
+              </code>{" "}
+              for verbose parse logging.
+            </>
+          )}
         </p>
       </header>
 
-      <label
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={onDrop}
-        className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-900/50 px-6 py-14 transition hover:border-cyan-600/60 hover:bg-slate-900"
-      >
-        <span className="text-slate-300">
-          Drag and drop CSV here, or click to choose a file
-        </span>
-        <input
-          type="file"
-          accept=".csv,text/csv,text/plain"
-          className="sr-only"
-          onChange={onFileInput}
-        />
-        {fileName ? (
-          <span className="mt-3 text-xs text-slate-500">{fileName}</span>
-        ) : null}
-      </label>
+      {embedded && embeddedLoading ? (
+        <p className="mb-4 rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-8 text-center text-slate-300">
+          Loading model output…
+        </p>
+      ) : null}
+
+      {!embedded || !embeddedLoading ? (
+        <label
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
+          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-900/50 px-6 py-14 transition hover:border-cyan-600/60 hover:bg-slate-900"
+        >
+          <span className="text-slate-300">
+            {embedded
+              ? "Drag and drop another CSV here, or click to choose a file"
+              : "Drag and drop CSV here, or click to choose a file"}
+          </span>
+          <input
+            type="file"
+            accept=".csv,text/csv,text/plain"
+            className="sr-only"
+            onChange={onFileInput}
+          />
+          {fileName ? (
+            <span className="mt-3 text-xs text-slate-500">{fileName}</span>
+          ) : null}
+        </label>
+      ) : null}
 
       {error ? (
         <p className="mt-4 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
