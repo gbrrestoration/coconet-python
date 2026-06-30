@@ -222,5 +222,7 @@ output.csv
 config/*
 !config/example.yaml
 !config/small_example.csv
+!config/smoke_I_2p6.csv
+!config/smoke_I_2p6.yaml
 
 outputs

@@ -1,0 +1,7 @@
+# Companion config for config/smoke_I_2p6.csv (threads and paths are not read from the CSV).
+ensemble_threads: 4
+
+reefs_file: legacy/reefs2024.csv
+coastline_file: legacy/coastline.csv
+output_file: output.csv
+log_level: INFO

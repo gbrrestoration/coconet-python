@@ -1,0 +1,75 @@
+Climate scenario, 2.6
+
+# Rapid smoke test (SSP2.6): 2y spinup backtrack, 2y projection, 4 ensembles.
+# Run: uv run coconet --config config/smoke_I_2p6.yaml --parameter-file config/smoke_I_2p6.csv --output-file output.csv
+
+Ensemble runs, 4
+Start year, 2025
+Save year, 2025
+Projection year, 2025
+End year, 2026
+Search year, 9999
+Spinup backtrack (years), 2
+
+CoTS control start year, 9999
+CoTS control ecological threshold (CoTS per ha), 8
+CoTS control CoTS threshold (CoTS per ha), 999999
+CoTS control coral threshold (CoTS per ha), 0
+CoTS vessels across GBR, 0
+CoTS vessels in Far-northern Region, 0
+CoTS vessels in Northern Region, 0
+CoTS vessels in Central Region, 0
+CoTS vessels in Southern Region, 0
+Catchment restoration start year, 9999
+Catchment restoration timescale (years), 0
+Future zoning start year, 9999
+Number of reefs included in future rezoning, 0
+
+Reduction in fisheries catch start year, 9999
+ Fractional reduction in fisheries catches, 0
+
+Upper fish size limit start year, 9999
+Lower fish size limit start year, 9999
+Exclude fishing from active outbreak reefs start year, 9999
+
+Emperor release start year, 9999
+Number of release reefs, 500
+Maximum adult emperors (per ha) for release, 9999999
+Number of juvenile emperors released per reef, 0
+
+Regional shading start year, 9999
+Absolute DHW reduction due to regional shading (DHW), 0
+
+Minimum longitude of interventions, 140
+Maximum longitude of interventions, 155
+Minimum latitude of interventions, -25
+Maximum latitude of interventions, -9
+
+Rubble consolidation start year, 9999
+Annual number of consolidated reefs, 0
+Minimum rubble cover threshold for consolidation [0 1], 0
+Total annual consolidated area (ha) , 0
+
+Thermally tolerant coral seeding start year, 9999
+Annual number of reefs seeded with coral, 0
+Maximum coral cover threshold for coral seeding [0 1], 0
+Total annual area of seeded corals (ha), 0
+Fraction of staghorn acropora corals able to hybridise with thermally tolerant corals [0 1], 0
+Dominance of thermally tolerant corals in setting thermal tolerance of hybrids [0 1], 0
+
+Coral slicks start year, 9999
+Annual number of reefs with coral slicks released, 0
+Maximum coral cover threshold for coral slicks [0 1], 0
+Total annual area of slick corals (ha), 0
+
+Reef shading start year, 9999
+Annual number of reefs locally shaded, 0
+Fractional DHW reduction due to local shading [0 1], 0
+
+Ocean acidification treatment start year, 9999
+Annual number of reefs treated for ocean acidification, 0
+Fractional protection from ocean acidification [0 1], 0
+
+CoTS vessels in active sector, 0
+
+Ensemble, Year, Reef_ID, Region, Shelf_position, Rezone_year, Priority, Longitude, Latitude, km_offshore, Reef_sites,C_sa, C_ta, C_mo, C_po, C_fa, C_tt, C_out_degree, DHW, bleach_sa, bleach_ta, bleach_mo, bleach_po, bleach_fa, bleach_tt, Maximum_cyclone_category, cyclone_sa, cyclone_ta, cyclone_mo, cyclone_po, cyclone_fa, cyclone_tt, predate_sa, predate_ta, predate_mo, predate_po, predate_fa, predate_tt, S_1, S_2, S_3, S_4, S_5, S_6, S_manta, Control_dives, Benthic_invert, Triggerfish, E_1, E_2, E_3, E_4, E_5, E_catch_kg,G_1, G_2, G_3, G_4, G_5, G_catch_kg
