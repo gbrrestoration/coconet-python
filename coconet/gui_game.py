@@ -1,0 +1,508 @@
+"""Reef Lounge: facts, timer, and CoCoNet-themed reef management mini-sim."""
+
+from __future__ import annotations
+
+import random
+import time
+import tkinter as tk
+from tkinter import ttk
+from typing import ClassVar
+
+from coconet.reef_lounge_sim import (
+    INTERVENTION_COSTS,
+    INTERVENTION_LABELS,
+    InterventionKind,
+    SimEvent,
+    apply_intervention,
+    format_meters,
+    initial_reef_state,
+    is_reef_collapsed,
+    simulate_step,
+)
+
+REEF_FACTS: tuple[str, ...] = (
+    "Thermally tolerant coral types (tt) can raise reef bleaching thresholds in CoCoNet.",
+    "Degree heating weeks (DHW) drive bleaching severity after the projection year.",
+    "Cyclones damage coral structure and can worsen CoTS dynamics on affected reefs.",
+    "CoTS control vessels target reefs when starfish density crosses ecological thresholds.",
+    "Coral seeding interventions add cover on reefs below a maximum coral threshold.",
+    "Regional and reef shading reduce DHW experienced by corals during heatwaves.",
+    "Fishing regulation and emperor releases support fish biodiversity in the model.",
+    "Catchment restoration slows flood loads that amplify cyclone stress on reefs.",
+    "Ensemble runs repeat the simulation with different random seeds after spin-up.",
+    "Rubble consolidation removes rubble cover where thresholds are exceeded.",
+    "Ocean acidification treatments buffer coral growth stress under high SSP scenarios.",
+    "Spin-up ensemble 0 warms the system before stochastic replicate ensembles begin.",
+)
+
+
+class ReefBreakGame:
+    """Waiting room with reef facts and a lightweight threat/intervention simulator."""
+
+    FACT_MS = 5000
+    TIMER_MS = 1000
+    SIM_MS = 4000
+    WINDOW_WIDTH = 500
+    WINDOW_HEIGHT = 820
+    FACT_PANEL_HEIGHT = 84
+    EVENT_PANEL_HEIGHT = 76
+    CONTENT_WIDTH = 468
+
+    COLORS: ClassVar[dict[str, str]] = {
+        "bg": "#082f49",
+        "panel": "#0c4a6e",
+        "text": "#ecfeff",
+        "muted": "#94a3b8",
+        "coral": "#fb7185",
+        "fish": "#34d399",
+        "dhw": "#f97316",
+        "cots": "#a855f7",
+        "accent": "#38bdf8",
+        "warn": "#fbbf24",
+    }
+
+    def __init__(self, parent: tk.Misc) -> None:
+        self._parent = parent
+        self._rng = random.Random()
+        self._reef = initial_reef_state()
+        self._window: tk.Toplevel | None = None
+        self._elapsed_var = tk.StringVar(value="Elapsed 0:00")
+        self._fact_var = tk.StringVar(value=REEF_FACTS[0])
+        self._meters_var = tk.StringVar(value=format_meters(self._reef))
+        self._event_var = tk.StringVar(value="Manage the reef while CoCoNet runs.")
+        self._overlay_var = tk.StringVar(value="")
+        self._fact_index = 0
+        self._run_started_at: float | None = None
+        self._active = False
+        self._run_in_progress = False
+        self._overlay_frame: tk.Frame | None = None
+        self._content_frame: tk.Frame | None = None
+        self._coral_bar: ttk.Progressbar | None = None
+        self._fish_bar: ttk.Progressbar | None = None
+        self._dhw_bar: ttk.Progressbar | None = None
+        self._intervention_buttons: list[tk.Button] = []
+        self._game_over = False
+        self._gameover_frame: tk.Frame | None = None
+        self._cots_bar: ttk.Progressbar | None = None
+
+    @property
+    def score(self) -> int:
+        return self._reef.score
+
+    def on_run_started(self) -> None:
+        """Reset simulator state when a model run begins (does not open the window)."""
+        self._run_in_progress = True
+        self._run_started_at = time.monotonic()
+        self._reef = initial_reef_state()
+        self._fact_index = 0
+        self._game_over = False
+        if self._window is not None and self._window.winfo_exists():
+            self._sync_ui()
+            self._hide_overlay()
+            self._hide_game_over()
+            self._set_interventions_enabled(True)
+
+    def open(self) -> None:
+        """Open Reef Lounge when the user clicks the launch button."""
+        if not self._run_in_progress:
+            return
+        self._ensure_window()
+        self._active = True
+        self._hide_overlay()
+        if self._game_over:
+            self._hide_game_over()
+            self._reef = initial_reef_state()
+            self._game_over = False
+            self._set_interventions_enabled(True)
+        self._sync_ui()
+        self._schedule_updates()
+
+    def notify_run_ended(self, message: str) -> None:
+        self._run_in_progress = False
+        self._active = False
+        if self._window is not None and self._window.winfo_exists():
+            self._overlay_var.set(
+                f"{message}\n\n"
+                f"Final coral {self._reef.coral_cover:.0f}% · fish {self._reef.fish_biodiversity:.0f}%\n"
+                f"Interventions used: {self._reef.interventions_used} · "
+                f"Threats weathered: {self._reef.threats_weathered}\n"
+                f"Reef score: {self.score}"
+            )
+            self._show_overlay()
+
+    def _ensure_window(self) -> None:
+        if self._window is not None and self._window.winfo_exists():
+            self._window.deiconify()
+            self._window.lift()
+            return
+
+        window = tk.Toplevel(self._parent)
+        window.title("Reef Lounge")
+        window.resizable(False, False)
+        window.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
+        window.minsize(self.WINDOW_WIDTH, self.WINDOW_HEIGHT)
+        window.maxsize(self.WINDOW_WIDTH, self.WINDOW_HEIGHT)
+        window.configure(bg=self.COLORS["bg"])
+        window.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        outer = tk.Frame(window, bg=self.COLORS["bg"], padx=16, pady=14)
+        outer.pack()
+
+        tk.Label(
+            outer,
+            text="Reef Lounge",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["text"],
+            font=_font(16, bold=True),
+        ).pack(anchor=tk.W)
+
+        tk.Label(
+            outer,
+            text="Respond to reef threats with CoCoNet-style interventions",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            font=_font(10),
+        ).pack(anchor=tk.W, pady=(2, 12))
+
+        self._content_frame = tk.Frame(outer, bg=self.COLORS["bg"])
+        self._content_frame.pack(fill=tk.BOTH)
+
+        tk.Label(
+            self._content_frame,
+            textvariable=self._elapsed_var,
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["text"],
+            font=("Consolas", 12),
+        ).pack(anchor=tk.W, pady=(0, 8))
+
+        fact_box = tk.Frame(
+            self._content_frame,
+            bg=self.COLORS["panel"],
+            width=self.CONTENT_WIDTH,
+            height=self.FACT_PANEL_HEIGHT,
+        )
+        fact_box.pack(fill=tk.X, pady=(0, 12))
+        fact_box.pack_propagate(False)
+        tk.Label(
+            fact_box,
+            textvariable=self._fact_var,
+            bg=self.COLORS["panel"],
+            fg=self.COLORS["text"],
+            font=_font(11),
+            padx=14,
+            pady=14,
+            wraplength=self.CONTENT_WIDTH - 28,
+            justify=tk.LEFT,
+            anchor=tk.NW,
+        ).pack(fill=tk.BOTH, expand=True)
+
+        sim = tk.LabelFrame(
+            self._content_frame,
+            text="Mini reef status",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            padx=12,
+            pady=10,
+        )
+        sim.pack(fill=tk.X, pady=(0, 10))
+
+        self._coral_bar = _meter_row(sim, "Coral cover", self.COLORS["coral"])
+        self._fish_bar = _meter_row(sim, "Fish biodiversity", self.COLORS["fish"])
+        self._dhw_bar = _meter_row(sim, "Degree heating weeks", self.COLORS["dhw"], maximum=16)
+        self._cots_bar = _meter_row(sim, "CoTS pressure", self.COLORS["cots"])
+
+        tk.Label(
+            sim,
+            textvariable=self._meters_var,
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            font=_font(9),
+            wraplength=self.CONTENT_WIDTH - 24,
+            justify=tk.LEFT,
+            anchor=tk.NW,
+            height=2,
+        ).pack(anchor=tk.W, pady=(8, 0), fill=tk.X)
+
+        event_box = tk.Frame(
+            self._content_frame,
+            bg=self.COLORS["panel"],
+            width=self.CONTENT_WIDTH,
+            height=self.EVENT_PANEL_HEIGHT,
+        )
+        event_box.pack(fill=tk.X, pady=(0, 12))
+        event_box.pack_propagate(False)
+        tk.Label(
+            event_box,
+            textvariable=self._event_var,
+            bg=self.COLORS["panel"],
+            fg=self.COLORS["warn"],
+            font=_font(10, bold=True),
+            padx=12,
+            pady=10,
+            wraplength=self.CONTENT_WIDTH - 24,
+            justify=tk.LEFT,
+            anchor=tk.NW,
+        ).pack(fill=tk.BOTH, expand=True)
+
+        self._gameover_frame = tk.Frame(self._content_frame, bg=self.COLORS["bg"])
+        tk.Label(
+            self._gameover_frame,
+            text="GAME OVER — coral and fish biodiversity lost",
+            bg="#7f1d1d",
+            fg="#fecaca",
+            font=_font(11, bold=True),
+            padx=12,
+            pady=10,
+            wraplength=self.CONTENT_WIDTH - 24,
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            self._gameover_frame,
+            text="The reef collapsed under stress. Restart to try new interventions.",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            font=_font(10),
+            wraplength=self.CONTENT_WIDTH - 24,
+            justify=tk.LEFT,
+        ).pack(anchor=tk.W, pady=(0, 8))
+        tk.Button(
+            self._gameover_frame,
+            text="Restart game",
+            command=self._restart_game,
+            bg=self.COLORS["accent"],
+            fg="#0f172a",
+            activebackground="#7dd3fc",
+            relief=tk.FLAT,
+            padx=12,
+            pady=8,
+        ).pack(anchor=tk.W)
+
+        interventions = tk.LabelFrame(
+            self._content_frame,
+            text="Interventions (spend management points)",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            padx=10,
+            pady=10,
+        )
+        interventions.pack(fill=tk.X)
+
+        grid = tk.Frame(interventions, bg=self.COLORS["bg"])
+        grid.pack(fill=tk.X)
+
+        kinds: tuple[InterventionKind, ...] = tuple(INTERVENTION_LABELS)
+        for index, kind in enumerate(kinds):
+            row, col = divmod(index, 2)
+            cost = INTERVENTION_COSTS[kind]
+            label = f"{INTERVENTION_LABELS[kind]} ({cost} pt)"
+            btn = tk.Button(
+                grid,
+                text=label,
+                command=lambda k=kind: self._use_intervention(k),
+                bg=self.COLORS["panel"],
+                fg=self.COLORS["text"],
+                activebackground="#155e75",
+                relief=tk.FLAT,
+                padx=8,
+                pady=6,
+                wraplength=210,
+                justify=tk.CENTER,
+            )
+            btn.grid(row=row, column=col, sticky=tk.EW, padx=4, pady=4)
+            self._intervention_buttons.append(btn)
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
+
+        tk.Label(
+            outer,
+            text="Close anytime · launch again with Reef Lounge while the run is active",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            font=_font(9),
+        ).pack(anchor=tk.W, pady=(12, 0))
+
+        self._overlay_frame = tk.Frame(outer, bg=self.COLORS["bg"])
+        tk.Label(
+            self._overlay_frame,
+            text="CoCoNet run finished",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["accent"],
+            font=_font(14, bold=True),
+        ).pack(pady=(8, 6))
+        tk.Label(
+            self._overlay_frame,
+            textvariable=self._overlay_var,
+            bg=self.COLORS["panel"],
+            fg=self.COLORS["text"],
+            font=_font(11),
+            padx=14,
+            pady=14,
+            wraplength=460,
+            justify=tk.CENTER,
+        ).pack(fill=tk.X)
+
+        self._window = window
+        window.update_idletasks()
+        window.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
+
+    def _use_intervention(self, kind: InterventionKind) -> None:
+        if not self._run_in_progress or self._game_over:
+            return
+        self._reef, event = apply_intervention(self._reef, kind)
+        self._show_event(event)
+        self._sync_ui()
+        self._check_game_over()
+
+    def _simulate(self) -> None:
+        if not self._run_in_progress or self._game_over:
+            return
+        self._reef, events = simulate_step(self._reef, rng=self._rng)
+        if events:
+            self._show_event(events[-1])
+        self._sync_ui()
+        self._check_game_over()
+
+    def _check_game_over(self) -> None:
+        if is_reef_collapsed(self._reef):
+            self._set_game_over()
+
+    def _set_game_over(self) -> None:
+        if self._game_over:
+            return
+        self._game_over = True
+        self._event_var.set(
+            f"Reef collapsed at score {self.score}. "
+            "Coral cover and fish biodiversity are both gone."
+        )
+        self._set_interventions_enabled(False)
+        self._show_game_over()
+
+    def _show_game_over(self) -> None:
+        if self._gameover_frame is None:
+            return
+        self._gameover_frame.pack(fill=tk.X, pady=(0, 12))
+
+    def _hide_game_over(self) -> None:
+        if self._gameover_frame is not None:
+            self._gameover_frame.pack_forget()
+
+    def _restart_game(self) -> None:
+        if not self._run_in_progress:
+            return
+        self._reef = initial_reef_state()
+        self._game_over = False
+        self._event_var.set("Reef reset — new interventions, new chances.")
+        self._hide_game_over()
+        self._set_interventions_enabled(True)
+        self._sync_ui()
+        if self._active:
+            self._schedule_updates()
+
+    def _set_interventions_enabled(self, enabled: bool) -> None:
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for button in self._intervention_buttons:
+            button.configure(state=state)
+
+    def _show_event(self, event: SimEvent) -> None:
+        self._event_var.set(event.message)
+
+    def _sync_ui(self) -> None:
+        self._meters_var.set(format_meters(self._reef))
+        if self._coral_bar is not None:
+            self._coral_bar["value"] = self._reef.coral_cover
+        if self._fish_bar is not None:
+            self._fish_bar["value"] = self._reef.fish_biodiversity
+        if self._dhw_bar is not None:
+            self._dhw_bar["value"] = min(16.0, self._reef.dhw)
+        if self._cots_bar is not None:
+            self._cots_bar["value"] = self._reef.cots_pressure
+        self._update_elapsed()
+
+    def _update_elapsed(self) -> None:
+        if self._run_started_at is None:
+            self._elapsed_var.set("Elapsed 0:00")
+            return
+        seconds = int(time.monotonic() - self._run_started_at)
+        minutes, secs = divmod(seconds, 60)
+        self._elapsed_var.set(f"Elapsed {minutes}:{secs:02d}")
+
+    def _rotate_fact(self) -> None:
+        self._fact_index = (self._fact_index + 1) % len(REEF_FACTS)
+        self._fact_var.set(REEF_FACTS[self._fact_index])
+
+    def _schedule_updates(self) -> None:
+        if not self._active or self._window is None or not self._window.winfo_exists():
+            return
+        self._window.after(self.TIMER_MS, self._on_timer)
+        self._window.after(self.FACT_MS, self._on_fact)
+        self._window.after(self.SIM_MS, self._on_sim)
+
+    def _on_timer(self) -> None:
+        if not self._active:
+            return
+        self._update_elapsed()
+        if self._window is not None and self._window.winfo_exists():
+            self._window.after(self.TIMER_MS, self._on_timer)
+
+    def _on_fact(self) -> None:
+        if not self._active:
+            return
+        self._rotate_fact()
+        if self._window is not None and self._window.winfo_exists():
+            self._window.after(self.FACT_MS, self._on_fact)
+
+    def _on_sim(self) -> None:
+        if not self._active or not self._run_in_progress or self._game_over:
+            return
+        self._simulate()
+        if self._window is not None and self._window.winfo_exists():
+            self._window.after(self.SIM_MS, self._on_sim)
+
+    def _show_overlay(self) -> None:
+        if self._overlay_frame is not None:
+            self._overlay_frame.pack(fill=tk.X, pady=(12, 0))
+        if self._content_frame is not None:
+            self._content_frame.pack_forget()
+
+    def _hide_overlay(self) -> None:
+        if self._overlay_frame is not None:
+            self._overlay_frame.pack_forget()
+        if self._content_frame is not None:
+            self._content_frame.pack(fill=tk.BOTH)
+
+    def _on_close(self) -> None:
+        self._active = False
+        if self._window is not None:
+            self._window.withdraw()
+
+
+def _meter_row(
+    parent: tk.Misc,
+    label: str,
+    color: str,
+    *,
+    maximum: float = 100,
+) -> ttk.Progressbar:
+    row = tk.Frame(parent, bg=parent.cget("bg"))
+    row.pack(fill=tk.X, pady=3)
+    tk.Label(row, text=label, bg=parent.cget("bg"), fg=color, width=20, anchor=tk.W).pack(side=tk.LEFT)
+    bar = ttk.Progressbar(row, maximum=maximum, length=280)
+    bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+    return bar
+
+
+def _font(size: int, *, bold: bool = False) -> tuple[str, int, str] | tuple[str, int]:
+    family = "Segoe UI" if _sys_platform() == "win32" else "Helvetica"
+    if bold:
+        return (family, size, "bold")
+    return (family, size)
+
+
+def _sys_platform() -> str:
+    import sys
+
+    return sys.platform
+
+
+def format_elapsed(seconds: int) -> str:
+    minutes, secs = divmod(max(0, seconds), 60)
+    return f"{minutes}:{secs:02d}"

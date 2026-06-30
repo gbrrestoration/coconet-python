@@ -16,6 +16,7 @@ from typing import Any, Literal
 from coconet.api import load_coconet_config, run_coconet
 from coconet.app_paths import bundled_path
 from coconet.gui_config import ConfigEditorPanel
+from coconet.gui_game import ReefBreakGame
 from coconet.logging_utils import configure_logging
 from coconet.run_control import RunController, RunStopped
 from coconet.viz_viewer import launch_chart_viewer
@@ -50,6 +51,7 @@ class CoconetGuiApp:
         self._run_thread: threading.Thread | None = None
         self._last_output_file: Path | None = None
         self._run_control = RunController()
+        self._reef_game = ReefBreakGame(self.root)
 
         self.config_mode = tk.StringVar(value="file")
         self.config_path = tk.StringVar()
@@ -242,6 +244,14 @@ class CoconetGuiApp:
         )
         self.charts_button.pack(side=tk.LEFT, padx=(8, 0))
 
+        self.game_button = ttk.Button(
+            actions,
+            text="Reef Lounge",
+            command=self._on_open_reef_game,
+            state=tk.DISABLED,
+        )
+        self.game_button.pack(side=tk.LEFT, padx=(8, 0))
+
         self.progress = ttk.Progressbar(actions, mode="indeterminate", length=180)
         self.progress.pack(side=tk.RIGHT)
 
@@ -348,9 +358,11 @@ class CoconetGuiApp:
         if running:
             self.open_button.configure(state=tk.DISABLED)
             self.charts_button.configure(state=tk.DISABLED)
+            self.game_button.configure(state=tk.NORMAL)
             self.progress.start(12)
         else:
             self.pause_button.configure(text="Pause")
+            self.game_button.configure(state=tk.DISABLED)
             self.progress.stop()
 
     def _validate_inputs(self) -> dict[str, Any] | None:
@@ -438,6 +450,7 @@ class CoconetGuiApp:
         self._run_control.reset()
         self.pause_button.configure(text="Pause")
         self._set_running(True)
+        self._reef_game.on_run_started()
 
         self._run_thread = threading.Thread(
             target=self._run_model,
@@ -485,6 +498,13 @@ class CoconetGuiApp:
             if handler is not None:
                 root_logger.removeHandler(handler)
 
+    def _on_open_reef_game(self) -> None:
+        self._reef_game.open()
+
+    def _finish_run_ui(self, game_message: str) -> None:
+        self._set_running(False)
+        self._reef_game.notify_run_ended(game_message)
+
     def _on_pause(self) -> None:
         if self._run_control.is_paused():
             self._run_control.resume()
@@ -500,7 +520,7 @@ class CoconetGuiApp:
         self._log_queue.put("Stop requested — halting at the next year or ensemble boundary.")
 
     def _on_run_success(self, output_file: str) -> None:
-        self._set_running(False)
+        self._finish_run_ui("Nice reefkeeping!")
         self.open_button.configure(state=tk.NORMAL)
         self.charts_button.configure(state=tk.NORMAL)
         if messagebox.askyesno(
@@ -531,7 +551,7 @@ class CoconetGuiApp:
             messagebox.showerror("Chart viewer", str(exc))
 
     def _on_run_stopped(self) -> None:
-        self._set_running(False)
+        self._finish_run_ui("Run stopped.")
         output = self._resolve_chart_output()
         if output is not None:
             self._last_output_file = output
@@ -544,7 +564,7 @@ class CoconetGuiApp:
         )
 
     def _on_run_failure(self, message: str) -> None:
-        self._set_running(False)
+        self._finish_run_ui("Run failed.")
         messagebox.showerror("Run failed", message)
 
     def _on_open_output_folder(self) -> None:

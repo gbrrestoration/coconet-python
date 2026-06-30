@@ -12,9 +12,9 @@ The docs site is built with **Jekyll** from the [`documentation/`](https://githu
 
 > Links to the docs below use the **published site** so they work from this README on **GitHub** and on **PyPI** (which does not resolve repository-relative paths).
 
-## Two ways to run CoCoNet
+## Ways to run CoCoNet
 
-The same simulation engine is exposed for **shell-oriented workflows** and for **programmatic control**. Pick the entry point that matches how you are integrating the model.
+The same simulation engine is exposed for **shell-oriented workflows**, **programmatic control**, and a **desktop GUI**. Pick the entry point that matches how you are integrating the model.
 
 ### 1. Command-line interface (CLI)
 
@@ -50,6 +50,54 @@ run_coconet(cfg, configure_logs=True)
 
 For **advanced** embedding you can still construct **`CoconetModel`** directly from **`CoconetConfig`**. See the [Python API](https://gbrrestoration.github.io/coconet-python/python-api/) page for precedence, logging, and `__all__`.
 
+### 3. Desktop GUI (Windows and macOS)
+
+Use this when you want a **graphical window** to configure inputs, run the model, pause or stop long runs, and open interactive charts—without using the terminal for each step.
+
+- **Console script:** `coconet-gui` (installed with the package from a git checkout or local install).
+- **Module form:** `python -m coconet.gui` (same behaviour as `coconet-gui`).
+
+**From a git checkout** (install GUI extras for the chart viewer window and optional packaging tools):
+
+```bash
+uv sync --extra gui
+uv run coconet-gui
+```
+
+**After `pip install`** from a wheel that includes the GUI entry point:
+
+```bash
+pip install "coconet-python[gui]"
+coconet-gui
+```
+
+The GUI provides:
+
+- **Input / output files** — reefs CSV (required), coastline CSV, output path, and optional legacy parameter CSV.
+- **Scenario configuration** — either load a YAML file or **edit interactively** in a tabbed form (schedule, CoTS, fishing, interventions, and related fields). You can load a YAML file into the editor, edit values, and save back to YAML.
+- **Run controls** — log level, ensemble threads, **Run**, **Pause** / **Resume**, and **Stop** (stop and pause apply between simulation years; parallel ensemble workers may finish their current job after stop).
+- **Reef Lounge** — optional mini reef manager while the model runs (click **Reef Lounge** to open). Rotating reef facts, an elapsed timer, and a lightweight simulator: cyclones, bleaching from rising DHW, and CoTS outbreaks affect coral cover and fish biodiversity; spend management points on CoCoNet-style interventions (CoTS control, shading, seeding, fishing regulation, and more).
+- **Charts** — after a run, open the bundled React chart viewer (`viz/`) in a desktop window, or browse to any existing `output.csv`.
+
+**Standalone app (no Python install on the target machine):** build a folder-style executable with PyInstaller. This also builds the chart viewer assets (`viz/dist`).
+
+```bash
+# Windows
+.\packaging\build-gui.ps1
+
+# macOS / Linux
+./packaging/build-gui.sh
+```
+
+The built app is under `dist/CoCoNet/` (run `CoCoNet.exe` on Windows or `CoCoNet` on macOS). You still need to point the GUI at your **reefs CSV**; coastline and example scenario YAML are bundled.
+
+**Chart viewer only** (open charts for an existing output file):
+
+```bash
+uv run coconet-viz path/to/output.csv
+```
+
+
 ## Why this exists
 
 The `legacy/` directory contains the original monolithic NetLogo model (`CoCoNet V3_rubble.nlogo`) and its data files. This port migrates the model to a modern Python stack for:
@@ -67,13 +115,24 @@ The `legacy/` directory contains the original monolithic NetLogo model (`CoCoNet
   - `model.py` - simulation engine (ported procedures),
   - `api.py` - **library** entry points (`load_coconet_config`, `run_coconet`) for PyPI consumers and embedders,
   - `cli.py` - **CLI** entry point (`coconet` / `python -m coconet`),
+  - `gui.py` / `gui_config.py` - **desktop GUI** (`coconet-gui`),
+  - `viz_viewer/` - chart viewer launcher used by the GUI,
   - `__main__.py` - delegates to the CLI for `python -m coconet`.
+- `viz/` - React chart viewer (built into the desktop GUI; optional in browser via `npm run dev`).
+- `packaging/` - PyInstaller spec and scripts to build the desktop app (`dist/CoCoNet/`).
 
 ## Running with uv (from a git checkout)
 
 ```bash
 uv sync
 uv run coconet --parameter-file legacy/I_2p6.csv --output-file output.csv
+```
+
+**Desktop GUI** (see [Desktop GUI](#3-desktop-gui-windows-and-macos) above):
+
+```bash
+uv sync --extra gui
+uv run coconet-gui
 ```
 
 You can also use YAML config:
@@ -86,7 +145,7 @@ uv run coconet --config config/example.yaml --output-file output.csv
 
 A container image is built with [GitHub Actions](https://github.com/gbrrestoration/coconet-python/blob/main/.github/workflows/docker-publish.yml) on pushes to the default branch (`main`) and on SemVer tags `v*`. It is published to **GitHub Container Registry** as [`ghcr.io/gbrrestoration/coconet-python`](https://github.com/gbrrestoration/coconet-python/pkgs/container/coconet-python) (pull: `docker pull ghcr.io/gbrrestoration/coconet-python:latest`).
 
-The image is based on `python:3.12-slim-bookworm`, installs dependencies with **uv** (`uv sync --frozen`), bundles `legacy/` and `config/` under `/app`, and runs as UID **1000**. The container entrypoint is the **`coconet` CLI** (see [Two ways to run CoCoNet](#two-ways-to-run-coconet)). If you need the **library** interface instead, add `pip install coconet-python` (or copy the package) in your own image and call `load_coconet_config` / `run_coconet` from your code.
+The image is based on `python:3.12-slim-bookworm`, installs dependencies with **uv** (`uv sync --frozen`), bundles `legacy/` and `config/` under `/app`, and runs as UID **1000**. The container entrypoint is the **`coconet` CLI** (see [Ways to run CoCoNet](#ways-to-run-coconet)). If you need the **library** interface instead, add `pip install coconet-python` (or copy the package) in your own image and call `load_coconet_config` / `run_coconet` from your code.
 
 ### Input and output paths
 
