@@ -15,8 +15,8 @@ from typing import Any, Literal
 
 from coconet.api import load_coconet_config, run_coconet
 from coconet.app_paths import bundled_path
+from coconet.game import ReefRescuerGame
 from coconet.gui_config import ConfigEditorPanel
-from coconet.gui_game import ReefBreakGame
 from coconet.logging_utils import configure_logging
 from coconet.run_control import RunController, RunStopped
 from coconet.viz_viewer import launch_chart_viewer
@@ -51,7 +51,7 @@ class CoconetGuiApp:
         self._run_thread: threading.Thread | None = None
         self._last_output_file: Path | None = None
         self._run_control = RunController()
-        self._reef_game = ReefBreakGame(self.root)
+        self._reef_game = ReefRescuerGame(self.root)
 
         self.config_mode = tk.StringVar(value="file")
         self.config_path = tk.StringVar()

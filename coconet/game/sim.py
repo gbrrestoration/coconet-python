@@ -1,4 +1,4 @@
-"""Lightweight reef threat / intervention simulation for Reef Lounge."""
+"""Reef Rescuer mini-game simulation (independent of the CoCoNet model)."""
 
 from __future__ import annotations
 
@@ -33,6 +33,15 @@ INTERVENTION_COSTS: dict[InterventionKind, int] = {
     "ph_protection": 2,
 }
 
+MANAGEMENT_POINT_CAP = 8
+MANAGEMENT_POINTS_PER_TICK = 1
+DELAYED_EFFECT_TICKS = 2
+
+CORAL_SEEDING_GAIN = 18.0
+CORAL_SLICK_GAIN = 10.0
+FISHING_REGULATION_GAIN = 12.0
+EMPEROR_RELEASE_GAIN = 15.0
+
 INTERVENTION_LABELS: dict[InterventionKind, str] = {
     "cots_control": "CoTS control",
     "regional_shading": "Regional shading",
@@ -57,6 +66,8 @@ class ReefState:
     dhw_suppression_ticks: int = 0
     interventions_used: int = 0
     threats_weathered: int = 0
+    pending_coral: tuple[tuple[float, int], ...] = ()
+    pending_fish: tuple[tuple[float, int], ...] = ()
 
     @property
     def score(self) -> int:
@@ -66,6 +77,16 @@ class ReefState:
 def is_reef_collapsed(state: ReefState) -> bool:
     """True when both coral cover and fish biodiversity have been lost."""
     return state.coral_cover <= 0 and state.fish_biodiversity <= 0
+
+
+def difficulty_multiplier(elapsed_seconds: int) -> float:
+    """Ramp threat pressure each full minute survived (+18% per minute)."""
+    minutes = max(0, elapsed_seconds) // 60
+    return 1.0 + minutes * 0.18
+
+
+def _damage_scale(difficulty: float) -> float:
+    return 1.0 + (difficulty - 1.0) * 0.65
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,19 +103,83 @@ def initial_reef_state() -> ReefState:
     return ReefState()
 
 
-def ambient_tick(state: ReefState, *, rng: random.Random | None = None) -> tuple[ReefState, SimEvent | None]:
+def advance_pending_gains(state: ReefState) -> tuple[ReefState, list[SimEvent]]:
+    """Apply staged coral and fish gains from recent interventions."""
+    events: list[SimEvent] = []
+    coral_delta = 0.0
+    fish_delta = 0.0
+    new_coral: list[tuple[float, int]] = []
+    new_fish: list[tuple[float, int]] = []
+
+    for remaining, ticks_left in state.pending_coral:
+        per_tick = remaining / ticks_left
+        coral_delta += per_tick
+        ticks_left -= 1
+        remaining -= per_tick
+        if ticks_left > 0:
+            new_coral.append((remaining, ticks_left))
+
+    for remaining, ticks_left in state.pending_fish:
+        per_tick = remaining / ticks_left
+        fish_delta += per_tick
+        ticks_left -= 1
+        remaining -= per_tick
+        if ticks_left > 0:
+            new_fish.append((remaining, ticks_left))
+
+    if coral_delta > 0:
+        events.append(
+            SimEvent(
+                f"Coral planting taking hold: +{coral_delta:.0f}% cover.",
+                "intervention_effect",
+            )
+        )
+    if fish_delta > 0:
+        events.append(
+            SimEvent(
+                f"Fish populations responding: +{fish_delta:.0f}% biodiversity.",
+                "intervention_effect",
+            )
+        )
+
+    updated = replace(
+        state,
+        coral_cover=_clamp(state.coral_cover + coral_delta),
+        fish_biodiversity=_clamp(state.fish_biodiversity + fish_delta),
+        pending_coral=tuple(new_coral),
+        pending_fish=tuple(new_fish),
+    )
+    return updated, events
+
+
+def _queue_pending_gain(
+    pending: tuple[tuple[float, int], ...],
+    amount: float,
+) -> tuple[tuple[float, int], ...]:
+    return (*pending, (amount, DELAYED_EFFECT_TICKS))
+
+
+def ambient_tick(
+    state: ReefState,
+    *,
+    rng: random.Random | None = None,
+    difficulty: float = 1.0,
+) -> tuple[ReefState, SimEvent | None]:
     """Background warming, slow recovery, and management budget refresh."""
     rng = rng or random.Random()
     dhw_rise = 0.35 if state.dhw_suppression_ticks > 0 else 0.65
     dhw_rise += rng.uniform(-0.05, 0.15)
+    dhw_rise *= difficulty
     new_dhw = max(0.0, state.dhw + dhw_rise)
     suppression = max(0, state.dhw_suppression_ticks - 1)
 
-    coral = _clamp(state.coral_cover + 0.4)
-    fish = _clamp(state.fish_biodiversity + 0.2)
-    points = min(5, state.management_points)
-    if state.coral_cover >= 35 and state.fish_biodiversity >= 30:
-        points = min(5, points + 1)
+    recovery_scale = 1.0 + (difficulty - 1.0) * 0.45
+    coral = _clamp(state.coral_cover + 0.4 / recovery_scale)
+    fish = _clamp(state.fish_biodiversity + 0.2 / recovery_scale)
+    points = min(
+        MANAGEMENT_POINT_CAP,
+        state.management_points + MANAGEMENT_POINTS_PER_TICK,
+    )
 
     updated = replace(
         state,
@@ -113,21 +198,27 @@ def maybe_random_threat(
     state: ReefState,
     *,
     rng: random.Random | None = None,
+    difficulty: float = 1.0,
 ) -> tuple[ReefState, SimEvent | None]:
     rng = rng or random.Random()
     roll = rng.random()
 
-    if state.dhw >= 8.0 and roll < 0.55:
-        return _apply_bleaching(state)
-    if roll < 0.12:
-        return _apply_cyclone(state)
-    if (state.cots_pressure >= 45 or roll < 0.1) and rng.random() < 0.35:
-        return _apply_cots_outbreak(state)
+    bleach_chance = min(0.85, 0.55 * (1.0 + (difficulty - 1.0) * 0.45))
+    if state.dhw >= 8.0 and roll < bleach_chance:
+        return _apply_bleaching(state, difficulty)
+    cyclone_chance = min(0.32, 0.12 * difficulty)
+    if roll < cyclone_chance:
+        return _apply_cyclone(state, difficulty)
+    cots_roll_chance = min(0.22, 0.1 * difficulty)
+    cots_trigger_chance = min(0.55, 0.35 * difficulty)
+    if (state.cots_pressure >= 45 or roll < cots_roll_chance) and rng.random() < cots_trigger_chance:
+        return _apply_cots_outbreak(state, difficulty)
     return state, None
 
 
-def _apply_bleaching(state: ReefState) -> tuple[ReefState, SimEvent]:
+def _apply_bleaching(state: ReefState, difficulty: float = 1.0) -> tuple[ReefState, SimEvent]:
     severity = min(22.0, 8.0 + (state.dhw - 8.0) * 1.8)
+    severity *= _damage_scale(difficulty)
     coral_loss = severity * 0.7
     fish_loss = severity * 0.35
     updated = replace(
@@ -142,9 +233,10 @@ def _apply_bleaching(state: ReefState) -> tuple[ReefState, SimEvent]:
     )
 
 
-def _apply_cyclone(state: ReefState) -> tuple[ReefState, SimEvent]:
-    coral_loss = 16.0 + state.dhw * 0.3
-    fish_loss = 9.0
+def _apply_cyclone(state: ReefState, difficulty: float = 1.0) -> tuple[ReefState, SimEvent]:
+    scale = _damage_scale(difficulty)
+    coral_loss = (16.0 + state.dhw * 0.3) * scale
+    fish_loss = 9.0 * scale
     updated = replace(
         state,
         coral_cover=_clamp(state.coral_cover - coral_loss),
@@ -158,9 +250,10 @@ def _apply_cyclone(state: ReefState) -> tuple[ReefState, SimEvent]:
     )
 
 
-def _apply_cots_outbreak(state: ReefState) -> tuple[ReefState, SimEvent]:
-    coral_loss = 10.0 + state.cots_pressure * 0.12
-    fish_loss = 11.0 + state.cots_pressure * 0.08
+def _apply_cots_outbreak(state: ReefState, difficulty: float = 1.0) -> tuple[ReefState, SimEvent]:
+    scale = _damage_scale(difficulty)
+    coral_loss = (10.0 + state.cots_pressure * 0.12) * scale
+    fish_loss = (11.0 + state.cots_pressure * 0.08) * scale
     updated = replace(
         state,
         coral_cover=_clamp(state.coral_cover - coral_loss),
@@ -202,17 +295,29 @@ def apply_intervention(
         updated = replace(updated, dhw=max(0.0, updated.dhw - 2.5))
         msg = "Local reef shading reduced thermal stress."
     elif kind == "coral_seeding":
-        updated = replace(updated, coral_cover=_clamp(updated.coral_cover + 18))
-        msg = "Thermally tolerant coral seeding boosted cover."
+        updated = replace(
+            updated,
+            pending_coral=_queue_pending_gain(updated.pending_coral, CORAL_SEEDING_GAIN),
+        )
+        msg = "Coral seeding deployed — cover should rise over the next couple of ticks."
     elif kind == "coral_slick":
-        updated = replace(updated, coral_cover=_clamp(updated.coral_cover + 10))
-        msg = "A coral slick settled larvae onto depleted reef areas."
+        updated = replace(
+            updated,
+            pending_coral=_queue_pending_gain(updated.pending_coral, CORAL_SLICK_GAIN),
+        )
+        msg = "Coral slick released — larvae should settle over the next couple of ticks."
     elif kind == "fishing_regulation":
-        updated = replace(updated, fish_biodiversity=_clamp(updated.fish_biodiversity + 12))
-        msg = "Catch reductions helped emperor and trout populations recover."
+        updated = replace(
+            updated,
+            pending_fish=_queue_pending_gain(updated.pending_fish, FISHING_REGULATION_GAIN),
+        )
+        msg = "Fishing regulations enacted — fish biodiversity should recover over the next couple of ticks."
     elif kind == "emperor_release":
-        updated = replace(updated, fish_biodiversity=_clamp(updated.fish_biodiversity + 15))
-        msg = "Juvenile emperors were released on priority reefs."
+        updated = replace(
+            updated,
+            pending_fish=_queue_pending_gain(updated.pending_fish, EMPEROR_RELEASE_GAIN),
+        )
+        msg = "Juvenile emperors released — fish biodiversity should rise over the next couple of ticks."
     elif kind == "rubble_consolidation":
         updated = replace(updated, coral_cover=_clamp(updated.coral_cover + 8))
         msg = "Rubble consolidation created new settlement substrate."
@@ -230,13 +335,21 @@ def apply_intervention(
     return updated, SimEvent(msg, "intervention")
 
 
-def simulate_step(state: ReefState, *, rng: random.Random | None = None) -> tuple[ReefState, list[SimEvent]]:
+def simulate_step(
+    state: ReefState,
+    *,
+    rng: random.Random | None = None,
+    elapsed_seconds: int = 0,
+) -> tuple[ReefState, list[SimEvent]]:
     rng = rng or random.Random()
+    difficulty = difficulty_multiplier(elapsed_seconds)
     events: list[SimEvent] = []
-    state, ambient_event = ambient_tick(state, rng=rng)
+    state, ambient_event = ambient_tick(state, rng=rng, difficulty=difficulty)
     if ambient_event is not None:
         events.append(ambient_event)
-    state, threat = maybe_random_threat(state, rng=rng)
+    state, pending_events = advance_pending_gains(state)
+    events.extend(pending_events)
+    state, threat = maybe_random_threat(state, rng=rng, difficulty=difficulty)
     if threat is not None:
         events.append(threat)
     return state, events

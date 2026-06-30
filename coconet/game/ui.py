@@ -1,4 +1,4 @@
-"""Reef Lounge: facts, timer, and CoCoNet-themed reef management mini-sim."""
+"""Reef Rescuer window and controls for the desktop GUI."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import ClassVar
 
-from coconet.reef_lounge_sim import (
+from coconet.game.sim import (
     INTERVENTION_COSTS,
     INTERVENTION_LABELS,
     InterventionKind,
@@ -36,7 +36,7 @@ REEF_FACTS: tuple[str, ...] = (
 )
 
 
-class ReefBreakGame:
+class ReefRescuerGame:
     """Waiting room with reef facts and a lightweight threat/intervention simulator."""
 
     FACT_MS = 5000
@@ -66,13 +66,17 @@ class ReefBreakGame:
         self._rng = random.Random()
         self._reef = initial_reef_state()
         self._window: tk.Toplevel | None = None
-        self._elapsed_var = tk.StringVar(value="Elapsed 0:00")
+        self._elapsed_var = tk.StringVar(value="Time 0:00 · Best 0:00")
         self._fact_var = tk.StringVar(value=REEF_FACTS[0])
         self._meters_var = tk.StringVar(value=format_meters(self._reef))
-        self._event_var = tk.StringVar(value="Manage the reef while CoCoNet runs.")
+        self._event_var = tk.StringVar(
+            value="Survive as long as you can — threats intensify every minute."
+        )
         self._overlay_var = tk.StringVar(value="")
         self._fact_index = 0
-        self._run_started_at: float | None = None
+        self._game_elapsed_seconds = 0
+        self._game_segment_started_at: float | None = None
+        self._high_score_seconds = 0
         self._active = False
         self._run_in_progress = False
         self._overlay_frame: tk.Frame | None = None
@@ -92,10 +96,11 @@ class ReefBreakGame:
     def on_run_started(self) -> None:
         """Reset simulator state when a model run begins (does not open the window)."""
         self._run_in_progress = True
-        self._run_started_at = time.monotonic()
         self._reef = initial_reef_state()
         self._fact_index = 0
         self._game_over = False
+        self._high_score_seconds = 0
+        self._reset_game_timer()
         if self._window is not None and self._window.winfo_exists():
             self._sync_ui()
             self._hide_overlay()
@@ -113,20 +118,28 @@ class ReefBreakGame:
             self._hide_game_over()
             self._reef = initial_reef_state()
             self._game_over = False
+            self._reset_game_timer()
             self._set_interventions_enabled(True)
+        elif self._game_segment_started_at is None:
+            self._start_game_timer()
         self._sync_ui()
         self._schedule_updates()
 
     def notify_run_ended(self, message: str) -> None:
         self._run_in_progress = False
         self._active = False
+        if not self._game_over:
+            self._pause_game_timer()
+            self._high_score_seconds = max(self._high_score_seconds, self._game_elapsed_seconds)
         if self._window is not None and self._window.winfo_exists():
+            survival = self._game_elapsed_seconds
             self._overlay_var.set(
                 f"{message}\n\n"
+                f"Last survival: {format_elapsed(survival)}\n"
+                f"Best survival: {format_elapsed(self._high_score_seconds)}\n"
                 f"Final coral {self._reef.coral_cover:.0f}% · fish {self._reef.fish_biodiversity:.0f}%\n"
                 f"Interventions used: {self._reef.interventions_used} · "
-                f"Threats weathered: {self._reef.threats_weathered}\n"
-                f"Reef score: {self.score}"
+                f"Threats weathered: {self._reef.threats_weathered}"
             )
             self._show_overlay()
 
@@ -134,6 +147,8 @@ class ReefBreakGame:
         if self._window is not None and self._window.winfo_exists():
             self._window.deiconify()
             self._window.lift()
+            if self._active and not self._game_over and self._game_segment_started_at is None:
+                self._start_game_timer()
             return
 
         window = tk.Toplevel(self._parent)
@@ -158,11 +173,19 @@ class ReefBreakGame:
 
         tk.Label(
             outer,
-            text="Respond to reef threats with CoCoNet-style interventions",
+            text="Survive as long as you can — keep coral and fish alive",
             bg=self.COLORS["bg"],
             fg=self.COLORS["muted"],
             font=_font(10),
-        ).pack(anchor=tk.W, pady=(2, 12))
+        ).pack(anchor=tk.W, pady=(2, 4))
+
+        tk.Label(
+            outer,
+            text="Threats intensify every minute. Beat your best survival time.",
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["muted"],
+            font=_font(9),
+        ).pack(anchor=tk.W, pady=(0, 12))
 
         self._content_frame = tk.Frame(outer, bg=self.COLORS["bg"])
         self._content_frame.pack(fill=tk.BOTH)
@@ -174,6 +197,25 @@ class ReefBreakGame:
             fg=self.COLORS["text"],
             font=("Consolas", 12),
         ).pack(anchor=tk.W, pady=(0, 8))
+
+        controls = tk.Frame(self._content_frame, bg=self.COLORS["bg"])
+        controls.pack(fill=tk.X, pady=(0, 12))
+        _action_button(
+            controls,
+            text="Restart game",
+            command=self._restart_game,
+            bg=self.COLORS["accent"],
+            fg="#0f172a",
+            activebackground="#7dd3fc",
+        ).pack(side=tk.LEFT, padx=(0, 8))
+        _action_button(
+            controls,
+            text="Quit game",
+            command=self._quit_game,
+            bg=self.COLORS["panel"],
+            fg=self.COLORS["text"],
+            activebackground="#155e75",
+        ).pack(side=tk.LEFT)
 
         fact_box = tk.Frame(
             self._content_frame,
@@ -257,24 +299,13 @@ class ReefBreakGame:
         ).pack(fill=tk.X, pady=(0, 8))
         tk.Label(
             self._gameover_frame,
-            text="The reef collapsed under stress. Restart to try new interventions.",
+            text="The reef collapsed under stress. Restart to chase a longer survival time.",
             bg=self.COLORS["bg"],
             fg=self.COLORS["muted"],
             font=_font(10),
             wraplength=self.CONTENT_WIDTH - 24,
             justify=tk.LEFT,
         ).pack(anchor=tk.W, pady=(0, 8))
-        tk.Button(
-            self._gameover_frame,
-            text="Restart game",
-            command=self._restart_game,
-            bg=self.COLORS["accent"],
-            fg="#0f172a",
-            activebackground="#7dd3fc",
-            relief=tk.FLAT,
-            padx=12,
-            pady=8,
-        ).pack(anchor=tk.W)
 
         interventions = tk.LabelFrame(
             self._content_frame,
@@ -314,7 +345,7 @@ class ReefBreakGame:
 
         tk.Label(
             outer,
-            text="Close anytime · launch again with Reef Lounge while the run is active",
+            text="Quit closes the lounge · reopen with Reef Lounge while the run is active",
             bg=self.COLORS["bg"],
             fg=self.COLORS["muted"],
             font=_font(9),
@@ -355,7 +386,8 @@ class ReefBreakGame:
     def _simulate(self) -> None:
         if not self._run_in_progress or self._game_over:
             return
-        self._reef, events = simulate_step(self._reef, rng=self._rng)
+        elapsed = self._survival_seconds()
+        self._reef, events = simulate_step(self._reef, rng=self._rng, elapsed_seconds=elapsed)
         if events:
             self._show_event(events[-1])
         self._sync_ui()
@@ -369,12 +401,17 @@ class ReefBreakGame:
         if self._game_over:
             return
         self._game_over = True
+        before_best = self._high_score_seconds
+        survival = self._finalize_survival_time()
+        new_record = survival > before_best
+        record_note = " New best survival!" if new_record else ""
         self._event_var.set(
-            f"Reef collapsed at score {self.score}. "
-            "Coral cover and fish biodiversity are both gone."
+            f"Reef collapsed after {format_elapsed(survival)}.{record_note} "
+            f"Best: {format_elapsed(self._high_score_seconds)}."
         )
         self._set_interventions_enabled(False)
         self._show_game_over()
+        self._update_elapsed()
 
     def _show_game_over(self) -> None:
         if self._gameover_frame is None:
@@ -388,14 +425,57 @@ class ReefBreakGame:
     def _restart_game(self) -> None:
         if not self._run_in_progress:
             return
+        self._record_current_survival()
         self._reef = initial_reef_state()
         self._game_over = False
-        self._event_var.set("Reef reset — new interventions, new chances.")
+        self._reset_game_timer()
+        self._start_game_timer()
+        self._event_var.set("New round — survive longer than your best time.")
         self._hide_game_over()
         self._set_interventions_enabled(True)
         self._sync_ui()
         if self._active:
             self._schedule_updates()
+
+    def _quit_game(self) -> None:
+        self._record_current_survival()
+        self._active = False
+        if self._window is not None and self._window.winfo_exists():
+            self._window.withdraw()
+
+    def _record_current_survival(self) -> None:
+        if self._game_over:
+            return
+        self._pause_game_timer()
+        self._high_score_seconds = max(self._high_score_seconds, self._game_elapsed_seconds)
+
+    def _reset_game_timer(self) -> None:
+        self._game_elapsed_seconds = 0
+        self._game_segment_started_at = None
+
+    def _start_game_timer(self) -> None:
+        if self._game_over:
+            return
+        self._game_segment_started_at = time.monotonic()
+
+    def _pause_game_timer(self) -> None:
+        if self._game_segment_started_at is None:
+            return
+        self._game_elapsed_seconds += int(time.monotonic() - self._game_segment_started_at)
+        self._game_segment_started_at = None
+
+    def _survival_seconds(self) -> int:
+        extra = 0
+        if self._game_segment_started_at is not None:
+            extra = int(time.monotonic() - self._game_segment_started_at)
+        return self._game_elapsed_seconds + extra
+
+    def _finalize_survival_time(self) -> int:
+        self._pause_game_timer()
+        survival = self._game_elapsed_seconds
+        if survival > self._high_score_seconds:
+            self._high_score_seconds = survival
+        return survival
 
     def _set_interventions_enabled(self, enabled: bool) -> None:
         state = tk.NORMAL if enabled else tk.DISABLED
@@ -418,12 +498,8 @@ class ReefBreakGame:
         self._update_elapsed()
 
     def _update_elapsed(self) -> None:
-        if self._run_started_at is None:
-            self._elapsed_var.set("Elapsed 0:00")
-            return
-        seconds = int(time.monotonic() - self._run_started_at)
-        minutes, secs = divmod(seconds, 60)
-        self._elapsed_var.set(f"Elapsed {minutes}:{secs:02d}")
+        survival = self._survival_seconds()
+        self._elapsed_var.set(format_survival_display(survival, self._high_score_seconds))
 
     def _rotate_fact(self) -> None:
         self._fact_index = (self._fact_index + 1) % len(REEF_FACTS)
@@ -470,9 +546,29 @@ class ReefBreakGame:
             self._content_frame.pack(fill=tk.BOTH)
 
     def _on_close(self) -> None:
-        self._active = False
-        if self._window is not None:
-            self._window.withdraw()
+        self._quit_game()
+
+
+def _action_button(
+    parent: tk.Misc,
+    *,
+    text: str,
+    command: object,
+    bg: str,
+    fg: str,
+    activebackground: str,
+) -> tk.Button:
+    return tk.Button(
+        parent,
+        text=text,
+        command=command,
+        bg=bg,
+        fg=fg,
+        activebackground=activebackground,
+        relief=tk.FLAT,
+        padx=12,
+        pady=8,
+    )
 
 
 def _meter_row(
@@ -506,3 +602,12 @@ def _sys_platform() -> str:
 def format_elapsed(seconds: int) -> str:
     minutes, secs = divmod(max(0, seconds), 60)
     return f"{minutes}:{secs:02d}"
+
+
+def format_survival_display(survival_seconds: int, high_score_seconds: int) -> str:
+    minute = survival_seconds // 60
+    intensity = f" · Minute {minute}" if minute > 0 else ""
+    return (
+        f"Time {format_elapsed(survival_seconds)} · "
+        f"Best {format_elapsed(high_score_seconds)}{intensity}"
+    )
