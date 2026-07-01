@@ -1,0 +1,15 @@
+services:
+  reef-rescuer:
+    build:
+      context: .
+      dockerfile: Dockerfile.reef-rescuer
+    ports:
+      - "8080:8080"
+    environment:
+      REEF_RESCUER_SCORES_FILE: /data/leaderboard.json
+    volumes:
+      - reef-rescuer-scores:/data
+    restart: unless-stopped
+
+volumes:
+  reef-rescuer-scores:

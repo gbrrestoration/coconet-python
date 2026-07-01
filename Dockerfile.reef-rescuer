@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.12-slim-bookworm
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=/usr/local/bin/python3
+
+WORKDIR /app
+
+RUN useradd --create-home --shell /bin/bash --uid 1000 coconet
+RUN mkdir -p /data && chown coconet:coconet /data
+
+COPY pyproject.toml uv.lock README.md ./
+COPY coconet ./coconet
+
+RUN uv sync --frozen
+
+RUN chown -R coconet:coconet /app
+
+USER coconet
+
+ENV PATH="/app/.venv/bin:${PATH}" \
+    REEF_RESCUER_SCORES_FILE=/data/leaderboard.json
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')"
+
+CMD ["reef-rescuer", "--host", "0.0.0.0", "--port", "8080", "--scores-file", "/data/leaderboard.json"]

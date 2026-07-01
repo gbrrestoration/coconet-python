@@ -37,6 +37,10 @@ MANAGEMENT_POINT_CAP = 8
 MANAGEMENT_POINTS_PER_TICK = 1
 DELAYED_EFFECT_TICKS = 2
 
+# Difficulty: base floor at game start, then +18% per full minute survived.
+BASE_DIFFICULTY = 1.28
+DIFFICULTY_PER_MINUTE = 0.18
+
 CORAL_SEEDING_GAIN = 18.0
 CORAL_SLICK_GAIN = 10.0
 FISHING_REGULATION_GAIN = 12.0
@@ -58,10 +62,10 @@ INTERVENTION_LABELS: dict[InterventionKind, str] = {
 
 @dataclass(frozen=True, slots=True)
 class ReefState:
-    coral_cover: float = 72.0
-    fish_biodiversity: float = 68.0
-    dhw: float = 3.0
-    cots_pressure: float = 15.0
+    coral_cover: float = 62.0
+    fish_biodiversity: float = 58.0
+    dhw: float = 5.5
+    cots_pressure: float = 32.0
     management_points: int = 3
     dhw_suppression_ticks: int = 0
     interventions_used: int = 0
@@ -80,9 +84,9 @@ def is_reef_collapsed(state: ReefState) -> bool:
 
 
 def difficulty_multiplier(elapsed_seconds: int) -> float:
-    """Ramp threat pressure each full minute survived (+18% per minute)."""
+    """Ramp threat pressure from a raised base, +18% per full minute survived."""
     minutes = max(0, elapsed_seconds) // 60
-    return 1.0 + minutes * 0.18
+    return BASE_DIFFICULTY + minutes * DIFFICULTY_PER_MINUTE
 
 
 def _damage_scale(difficulty: float) -> float:
@@ -206,11 +210,11 @@ def maybe_random_threat(
     bleach_chance = min(0.85, 0.55 * (1.0 + (difficulty - 1.0) * 0.45))
     if state.dhw >= 8.0 and roll < bleach_chance:
         return _apply_bleaching(state, difficulty)
-    cyclone_chance = min(0.32, 0.12 * difficulty)
+    cyclone_chance = min(0.35, 0.14 * difficulty)
     if roll < cyclone_chance:
         return _apply_cyclone(state, difficulty)
-    cots_roll_chance = min(0.22, 0.1 * difficulty)
-    cots_trigger_chance = min(0.55, 0.35 * difficulty)
+    cots_roll_chance = min(0.24, 0.11 * difficulty)
+    cots_trigger_chance = min(0.58, 0.38 * difficulty)
     if (state.cots_pressure >= 45 or roll < cots_roll_chance) and rng.random() < cots_trigger_chance:
         return _apply_cots_outbreak(state, difficulty)
     return state, None

@@ -8,6 +8,9 @@ import tkinter as tk
 from tkinter import ttk
 from typing import ClassVar
 
+from coconet.game.facts import REEF_FACTS
+from coconet.game.formatting import format_elapsed, format_survival_display
+from coconet.game.help_text import HOW_TO_PLAY_STEPS, HOW_TO_PLAY_TITLE
 from coconet.game.sim import (
     INTERVENTION_COSTS,
     INTERVENTION_LABELS,
@@ -18,21 +21,6 @@ from coconet.game.sim import (
     initial_reef_state,
     is_reef_collapsed,
     simulate_step,
-)
-
-REEF_FACTS: tuple[str, ...] = (
-    "Thermally tolerant coral types (tt) can raise reef bleaching thresholds in CoCoNet.",
-    "Degree heating weeks (DHW) drive bleaching severity after the projection year.",
-    "Cyclones damage coral structure and can worsen CoTS dynamics on affected reefs.",
-    "CoTS control vessels target reefs when starfish density crosses ecological thresholds.",
-    "Coral seeding interventions add cover on reefs below a maximum coral threshold.",
-    "Regional and reef shading reduce DHW experienced by corals during heatwaves.",
-    "Fishing regulation and emperor releases support fish biodiversity in the model.",
-    "Catchment restoration slows flood loads that amplify cyclone stress on reefs.",
-    "Ensemble runs repeat the simulation with different random seeds after spin-up.",
-    "Rubble consolidation removes rubble cover where thresholds are exceeded.",
-    "Ocean acidification treatments buffer coral growth stress under high SSP scenarios.",
-    "Spin-up ensemble 0 warms the system before stochastic replicate ensembles begin.",
 )
 
 
@@ -70,7 +58,7 @@ class ReefRescuerGame:
         self._fact_var = tk.StringVar(value=REEF_FACTS[0])
         self._meters_var = tk.StringVar(value=format_meters(self._reef))
         self._event_var = tk.StringVar(
-            value="Survive as long as you can — threats intensify every minute."
+            value="Press Start game when you are ready."
         )
         self._overlay_var = tk.StringVar(value="")
         self._fact_index = 0
@@ -87,6 +75,10 @@ class ReefRescuerGame:
         self._intervention_buttons: list[tk.Button] = []
         self._game_over = False
         self._gameover_frame: tk.Frame | None = None
+        self._start_button: tk.Button | None = None
+        self._restart_button: tk.Button | None = None
+        self._quit_button: tk.Button | None = None
+        self._awaiting_start = True
         self._cots_bar: ttk.Progressbar | None = None
 
     @property
@@ -100,15 +92,17 @@ class ReefRescuerGame:
         self._fact_index = 0
         self._game_over = False
         self._high_score_seconds = 0
+        self._awaiting_start = True
         self._reset_game_timer()
         if self._window is not None and self._window.winfo_exists():
             self._sync_ui()
             self._hide_overlay()
             self._hide_game_over()
-            self._set_interventions_enabled(True)
+            self._sync_play_controls()
+            self._set_interventions_enabled(False)
 
     def open(self) -> None:
-        """Open Reef Lounge when the user clicks the launch button."""
+        """Open Reef Rescuer when the user clicks the launch button."""
         if not self._run_in_progress:
             return
         self._ensure_window()
@@ -119,8 +113,13 @@ class ReefRescuerGame:
             self._reef = initial_reef_state()
             self._game_over = False
             self._reset_game_timer()
-            self._set_interventions_enabled(True)
-        elif self._game_segment_started_at is None:
+            self._awaiting_start = True
+        if self._awaiting_start:
+            self._show_help_popup()
+            self._sync_play_controls()
+            self._sync_ui()
+            return
+        if self._game_segment_started_at is None:
             self._start_game_timer()
         self._sync_ui()
         self._schedule_updates()
@@ -147,8 +146,15 @@ class ReefRescuerGame:
         if self._window is not None and self._window.winfo_exists():
             self._window.deiconify()
             self._window.lift()
-            if self._active and not self._game_over and self._game_segment_started_at is None:
+            if (
+                self._active
+                and not self._awaiting_start
+                and not self._game_over
+                and self._game_segment_started_at is None
+            ):
                 self._start_game_timer()
+            if self._awaiting_start:
+                self._sync_play_controls()
             return
 
         window = tk.Toplevel(self._parent)
@@ -200,22 +206,46 @@ class ReefRescuerGame:
 
         controls = tk.Frame(self._content_frame, bg=self.COLORS["bg"])
         controls.pack(fill=tk.X, pady=(0, 12))
-        _action_button(
+        self._start_button = _action_button(
+            controls,
+            text="Start game",
+            command=self._begin_game,
+            bg=self.COLORS["accent"],
+            fg="#0f172a",
+            activebackground="#7dd3fc",
+        )
+        self._start_button.pack(side=tk.LEFT, padx=(0, 8))
+        self._restart_button = _action_button(
             controls,
             text="Restart game",
             command=self._restart_game,
             bg=self.COLORS["accent"],
             fg="#0f172a",
             activebackground="#7dd3fc",
-        ).pack(side=tk.LEFT, padx=(0, 8))
-        _action_button(
+        )
+        self._restart_button.pack(side=tk.LEFT, padx=(0, 8))
+        self._quit_button = _action_button(
             controls,
             text="Quit game",
             command=self._quit_game,
             bg=self.COLORS["panel"],
             fg=self.COLORS["text"],
             activebackground="#155e75",
-        ).pack(side=tk.LEFT)
+        )
+        self._quit_button.pack(side=tk.LEFT)
+
+        tk.Button(
+            controls,
+            text="How to play",
+            command=self._show_help_popup,
+            bg=self.COLORS["bg"],
+            fg=self.COLORS["accent"],
+            activebackground=self.COLORS["bg"],
+            activeforeground=self.COLORS["accent"],
+            relief=tk.FLAT,
+            padx=8,
+            pady=8,
+        ).pack(side=tk.LEFT, padx=(8, 0))
 
         fact_box = tk.Frame(
             self._content_frame,
@@ -372,11 +402,14 @@ class ReefRescuerGame:
         ).pack(fill=tk.X)
 
         self._window = window
+        self._sync_play_controls()
+        if self._awaiting_start:
+            self._show_help_popup()
         window.update_idletasks()
         window.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
 
     def _use_intervention(self, kind: InterventionKind) -> None:
-        if not self._run_in_progress or self._game_over:
+        if not self._run_in_progress or self._game_over or self._awaiting_start:
             return
         self._reef, event = apply_intervention(self._reef, kind)
         self._show_event(event)
@@ -410,6 +443,7 @@ class ReefRescuerGame:
             f"Best: {format_elapsed(self._high_score_seconds)}."
         )
         self._set_interventions_enabled(False)
+        self._sync_play_controls()
         self._show_game_over()
         self._update_elapsed()
 
@@ -425,6 +459,7 @@ class ReefRescuerGame:
     def _restart_game(self) -> None:
         if not self._run_in_progress:
             return
+        self._awaiting_start = False
         self._record_current_survival()
         self._reef = initial_reef_state()
         self._game_over = False
@@ -432,6 +467,7 @@ class ReefRescuerGame:
         self._start_game_timer()
         self._event_var.set("New round — survive longer than your best time.")
         self._hide_game_over()
+        self._sync_play_controls()
         self._set_interventions_enabled(True)
         self._sync_ui()
         if self._active:
@@ -440,8 +476,74 @@ class ReefRescuerGame:
     def _quit_game(self) -> None:
         self._record_current_survival()
         self._active = False
+        self._awaiting_start = True
         if self._window is not None and self._window.winfo_exists():
             self._window.withdraw()
+
+    def _begin_game(self) -> None:
+        if not self._run_in_progress or self._game_over or not self._awaiting_start:
+            return
+        self._awaiting_start = False
+        self._start_game_timer()
+        self._sync_play_controls()
+        self._set_interventions_enabled(True)
+        self._event_var.set("Survive as long as you can — threats intensify every minute.")
+        self._sync_ui()
+        if self._active:
+            self._schedule_updates()
+
+    def _sync_play_controls(self) -> None:
+        if self._start_button is not None:
+            start_state = tk.NORMAL if self._awaiting_start and not self._game_over else tk.DISABLED
+            self._start_button.configure(state=start_state)
+        if self._restart_button is not None:
+            restart_state = tk.NORMAL if not self._awaiting_start and self._run_in_progress else tk.DISABLED
+            self._restart_button.configure(state=restart_state)
+        if self._quit_button is not None:
+            quit_state = tk.NORMAL if not self._awaiting_start and self._run_in_progress else tk.DISABLED
+            self._quit_button.configure(state=quit_state)
+
+    def _show_help_popup(self) -> None:
+        if self._window is None or not self._window.winfo_exists():
+            return
+        popup = tk.Toplevel(self._window)
+        popup.title(HOW_TO_PLAY_TITLE)
+        popup.resizable(False, False)
+        popup.configure(bg=self.COLORS["panel"])
+        popup.transient(self._window)
+        popup.grab_set()
+
+        body = tk.Frame(popup, bg=self.COLORS["panel"], padx=16, pady=14)
+        body.pack()
+        tk.Label(
+            body,
+            text=HOW_TO_PLAY_TITLE,
+            bg=self.COLORS["panel"],
+            fg=self.COLORS["text"],
+            font=_font(12, bold=True),
+        ).pack(anchor=tk.W, pady=(0, 8))
+        for step in HOW_TO_PLAY_STEPS:
+            tk.Label(
+                body,
+                text=f"• {step}",
+                bg=self.COLORS["panel"],
+                fg=self.COLORS["text"],
+                font=_font(10),
+                wraplength=420,
+                justify=tk.LEFT,
+                anchor=tk.NW,
+            ).pack(anchor=tk.W, pady=2)
+        _action_button(
+            body,
+            text="OK",
+            command=popup.destroy,
+            bg=self.COLORS["accent"],
+            fg="#0f172a",
+            activebackground="#7dd3fc",
+        ).pack(anchor=tk.E, pady=(12, 0))
+
+        popup.update_idletasks()
+        popup.geometry(f"460x{popup.winfo_reqheight() + 10}")
 
     def _record_current_survival(self) -> None:
         if self._game_over:
@@ -527,7 +629,7 @@ class ReefRescuerGame:
             self._window.after(self.FACT_MS, self._on_fact)
 
     def _on_sim(self) -> None:
-        if not self._active or not self._run_in_progress or self._game_over:
+        if not self._active or not self._run_in_progress or self._game_over or self._awaiting_start:
             return
         self._simulate()
         if self._window is not None and self._window.winfo_exists():
@@ -597,17 +699,3 @@ def _sys_platform() -> str:
     import sys
 
     return sys.platform
-
-
-def format_elapsed(seconds: int) -> str:
-    minutes, secs = divmod(max(0, seconds), 60)
-    return f"{minutes}:{secs:02d}"
-
-
-def format_survival_display(survival_seconds: int, high_score_seconds: int) -> str:
-    minute = survival_seconds // 60
-    intensity = f" · Minute {minute}" if minute > 0 else ""
-    return (
-        f"Time {format_elapsed(survival_seconds)} · "
-        f"Best {format_elapsed(high_score_seconds)}{intensity}"
-    )

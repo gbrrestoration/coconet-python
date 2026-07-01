@@ -76,8 +76,38 @@ The GUI provides:
 - **Input / output files** — reefs CSV (required), coastline CSV, output path, and optional legacy parameter CSV.
 - **Scenario configuration** — either load a YAML file or **edit interactively** in a tabbed form (schedule, CoTS, fishing, interventions, and related fields). You can load a YAML file into the editor, edit values, and save back to YAML.
 - **Run controls** — log level, ensemble threads, **Run**, **Pause** / **Resume**, and **Stop** (stop and pause apply between simulation years; parallel ensemble workers may finish their current job after stop).
-- **Reef Lounge** — optional mini reef manager while the model runs (click **Reef Lounge** to open). Rotating reef facts, an elapsed timer, and a lightweight simulator: cyclones, bleaching from rising DHW, and CoTS outbreaks affect coral cover and fish biodiversity; spend management points on CoCoNet-style interventions (CoTS control, shading, seeding, fishing regulation, and more).
+- **Reef Rescuer** — optional mini reef manager while the model runs (click **Reef Rescuer** to open). Rotating reef facts, a survival timer, and a lightweight simulator: cyclones, bleaching from rising DHW, and CoTS outbreaks affect coral cover and fish biodiversity; spend management points on CoCoNet-style interventions (CoTS control, shading, seeding, fishing regulation, and more).
 - **Charts** — after a run, open the bundled React chart viewer (`viz/`) in a desktop window, or browse to any existing `output.csv`.
+
+### Reef Rescuer web game (Docker)
+
+The same mini-game can run as a **standalone browser game** without the CoCoNet GUI or model. It uses the shared simulation logic in `coconet/game/` and serves a small static web UI over HTTP.
+
+**Local dev:**
+
+```bash
+uv sync
+uv run reef-rescuer --host 127.0.0.1 --port 8080
+```
+
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080). Top scorers are at [http://127.0.0.1:8080/leaderboard.html](http://127.0.0.1:8080/leaderboard.html).
+
+When a run finishes in the **top 10** survival times on that server, the game prompts for your name so you can join the board.
+
+**Docker:**
+
+```bash
+docker compose -f docker-compose.reef-rescuer.yml up --build
+```
+
+Or build/run directly:
+
+```bash
+docker build -f Dockerfile.reef-rescuer -t reef-rescuer .
+docker run --rm -p 8080:8080 -v reef-rescuer-scores:/data reef-rescuer
+```
+
+The container exposes port **8080**, includes a health check at `/api/health`, and stores the top-10 leaderboard in `/data/leaderboard.json` (persisted with the Docker Compose volume or a `-v` mount).
 
 **Standalone app (no Python install on the target machine):** build a folder-style executable with PyInstaller. This also builds the chart viewer assets (`viz/dist`).
 

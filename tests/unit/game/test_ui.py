@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
+from coconet.game.formatting import format_elapsed, format_survival_display
 from coconet.game.sim import (
     advance_pending_gains,
     apply_intervention,
@@ -10,7 +11,6 @@ from coconet.game.sim import (
     maybe_random_threat,
     simulate_step,
 )
-from coconet.game.ui import format_elapsed, format_survival_display
 
 
 def test_format_elapsed() -> None:

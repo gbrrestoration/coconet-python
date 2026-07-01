@@ -35,10 +35,10 @@ def test_is_reef_collapsed_when_coral_and_fish_are_zero() -> None:
 
 
 def test_difficulty_multiplier_increases_each_minute() -> None:
-    assert difficulty_multiplier(0) == 1.0
-    assert difficulty_multiplier(59) == 1.0
-    assert difficulty_multiplier(60) == 1.18
-    assert difficulty_multiplier(120) == pytest.approx(1.36)
+    assert difficulty_multiplier(0) == 1.28
+    assert difficulty_multiplier(59) == 1.28
+    assert difficulty_multiplier(60) == pytest.approx(1.46)
+    assert difficulty_multiplier(120) == pytest.approx(1.64)
 
 
 def test_higher_difficulty_raises_dhw_faster() -> None:

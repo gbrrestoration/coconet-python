@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reef Rescuer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="help-dialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="dialog-card">
+        <h2 id="help-title">How to play Reef Rescuer</h2>
+        <ul id="help-steps" class="help-steps"></ul>
+        <div class="dialog-actions">
+          <button id="help-ok-btn" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="leaderboard-dialog" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title">
+      <div class="dialog-card">
+        <h2 id="leaderboard-title">Top 10 score!</h2>
+        <p id="leaderboard-message" class="dialog-message">
+          You made the top scorers. Add your name to the board.
+        </p>
+        <label class="name-label" for="leaderboard-name">Your name</label>
+        <input id="leaderboard-name" class="name-input" maxlength="24" autocomplete="name" />
+        <p id="leaderboard-error" class="form-error hidden"></p>
+        <div class="dialog-actions">
+          <button id="leaderboard-skip-btn" type="button" class="secondary">Skip</button>
+          <button id="leaderboard-save-btn" type="button">Save score</button>
+        </div>
+      </div>
+    </div>
+
+    <main class="shell" id="game-shell">
+      <header>
+        <h1>Reef Rescuer</h1>
+        <p class="lede">Survive as long as you can — keep coral and fish alive.</p>
+        <p class="sublede">Threats intensify every minute. Beat your best survival time.</p>
+        <button id="help-link" type="button" class="link-button">How to play</button>
+        <a class="text-link" href="/leaderboard.html">Top scorers</a>
+      </header>
+
+      <section class="timer-row">
+        <p id="elapsed" class="elapsed">Time 0:00 · Best 0:00</p>
+        <div class="controls">
+          <button id="start-game-btn" type="button">Start game</button>
+          <button id="restart-btn" type="button" disabled>Restart game</button>
+          <button id="quit-btn" type="button" class="secondary" disabled>Quit game</button>
+        </div>
+      </section>
+
+      <section class="fact panel" id="fact">Read how to play, then press Start game.</section>
+
+      <section class="status">
+        <h2>Mini reef status</h2>
+        <div class="meter">
+          <label>Coral cover</label>
+          <progress id="coral-bar" max="100" value="72"></progress>
+          <span id="coral-val">72%</span>
+        </div>
+        <div class="meter">
+          <label>Fish biodiversity</label>
+          <progress id="fish-bar" max="100" value="68"></progress>
+          <span id="fish-val">68%</span>
+        </div>
+        <div class="meter">
+          <label>Degree heating weeks</label>
+          <progress id="dhw-bar" max="16" value="3"></progress>
+          <span id="dhw-val">3.0</span>
+        </div>
+        <div class="meter">
+          <label>CoTS pressure</label>
+          <progress id="cots-bar" max="100" value="15"></progress>
+          <span id="cots-val">15%</span>
+        </div>
+        <p id="meters" class="meters"></p>
+      </section>
+
+      <section id="event" class="event panel">Press Start game when you are ready.</section>
+      <section id="game-over" class="game-over hidden">
+        <strong>GAME OVER — coral and fish biodiversity lost</strong>
+        <p>The reef collapsed under stress. Restart to chase a longer survival time.</p>
+      </section>
+
+      <section class="interventions">
+        <h2>Interventions (spend management points)</h2>
+        <div id="intervention-grid" class="grid"></div>
+      </section>
+
+      <footer>
+        <p>Standalone web edition · CoCoNet-themed reef management mini-game</p>
+      </footer>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

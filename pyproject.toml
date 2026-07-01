@@ -24,6 +24,7 @@ gui = [
 coconet = "coconet.cli:main"
 coconet-gui = "coconet.gui:main"
 coconet-viz = "coconet.viz_viewer:main"
+reef-rescuer = "coconet.game.web_server:main"
 
 [project.urls]
 Homepage = "https://github.com/gbrrestoration/coconet-python"
@@ -38,6 +39,9 @@ build-backend = "hatchling.build"
 # Distribution name is coconet-python; import package remains `coconet`.
 [tool.hatch.build.targets.wheel]
 packages = ["coconet"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"coconet/game/static" = "coconet/game/static"
 
 [dependency-groups]
 dev = [
